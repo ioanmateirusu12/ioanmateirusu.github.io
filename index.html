@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ioan-Matei Rusu — Biostatistică & analiză de date pentru cercetare medicală</title>
+<meta name="description" content="Ioan-Matei Rusu — biostatistician și student la Medicină (UMF „Grigore T. Popa” Iași). Analiză statistică pentru lucrări de licență, disertație, doctorat și articole științifice: metaanalize, regresie, analiză de supraviețuire, modelare matematică. R · Python · SPSS." />
+<meta name="author" content="Ioan-Matei Rusu" />
+<meta property="og:title" content="Ioan-Matei Rusu — Biostatistică pentru cercetare medicală" />
+<meta property="og:description" content="Analiză statistică riguroasă și reproductibilă: metaanalize, regresie, supraviețuire, modelare matematică. Iași / remote." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f6e5e'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='18' fill='%23f5f3ee' text-anchor='middle'%3ER%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#f4f1ea;
+    --surface:#fbfaf6;
+    --surface-2:#f0ece2;
+    --ink:#16181c;
+    --ink-2:#33373f;
+    --muted:#5d626b;
+    --faint:#8b8f98;
+    --line:#e0dccf;
+    --line-2:#d3cebd;
+    --accent:#0f6e5e;
+    --accent-dk:#0a5042;
+    --terra:#b4532a;
+    --maxw:1160px;
+    --sans:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --serif:'Newsreader',Georgia,'Times New Roman',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans);
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(120% 60% at 50% -10%,rgba(15,110,94,.06),transparent 60%);
+  }
+  ::selection{background:rgba(15,110,94,.18)}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .serif{font-family:var(--serif)}
+  .label{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+
+  /* buttons */
+  .btn{
+    display:inline-flex;align-items:center;gap:9px;cursor:pointer;
+    font-family:var(--sans);font-weight:600;font-size:15px;line-height:1;
+    padding:14px 22px;border-radius:2px;border:1px solid transparent;
+    transition:transform .18s ease,background .18s ease,color .18s ease,box-shadow .18s ease;
+    white-space:nowrap;
+  }
+  .btn .arr{transition:transform .2s ease}
+  .btn:hover .arr{transform:translateX(4px)}
+  .btn-primary{background:var(--accent);color:#fbfaf6;box-shadow:0 1px 0 var(--accent-dk)}
+  .btn-primary:hover{background:var(--accent-dk);transform:translateY(-1px)}
+  .btn-primary:active{transform:translateY(0)}
+  .btn-outline{background:transparent;border-color:var(--line-2);color:var(--ink)}
+  .btn-outline:hover{border-color:var(--ink);background:rgba(0,0,0,.02)}
+  .btn-sm{padding:10px 16px;font-size:14px}
+
+  /* ---------- HEADER ---------- */
+  header.site{
+    position:sticky;top:0;z-index:60;
+    background:rgba(244,241,234,.86);
+    backdrop-filter:saturate(150%) blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .head-inner{display:flex;align-items:center;justify-content:space-between;height:70px}
+  .logo{display:flex;align-items:baseline;gap:12px}
+  .logo .nm{font-family:var(--serif);font-size:21px;font-weight:600;letter-spacing:-.01em}
+  .logo .rl{font-size:12px;color:var(--muted);letter-spacing:.02em;border-left:1px solid var(--line-2);padding-left:12px}
+  nav.main{display:flex;align-items:center;gap:4px}
+  nav.main a.lnk{
+    position:relative;padding:9px 14px;font-size:14.5px;font-weight:500;color:var(--ink-2);
+  }
+  nav.main a.lnk::after{
+    content:"";position:absolute;left:14px;right:14px;bottom:5px;height:1.5px;background:var(--accent);
+    transform:scaleX(0);transform-origin:left;transition:transform .22s ease;
+  }
+  nav.main a.lnk:hover{color:var(--ink)}
+  nav.main a.lnk:hover::after{transform:scaleX(1)}
+  nav.main .btn{margin-left:10px}
+  .burger{display:none;width:44px;height:44px;border:1px solid var(--line-2);background:var(--surface);border-radius:3px;cursor:pointer;align-items:center;justify-content:center}
+  .burger span{display:block;width:18px;height:1.6px;background:var(--ink);position:relative}
+  .burger span::before,.burger span::after{content:"";position:absolute;left:0;width:18px;height:1.6px;background:var(--ink)}
+  .burger span::before{top:-6px}.burger span::after{top:6px}
+
+  /* ---------- HERO ---------- */
+  .hero{padding:78px 0 64px}
+  .hero-grid{display:grid;grid-template-columns:1.08fr .92fr;gap:64px;align-items:center}
+  .status{display:inline-flex;align-items:center;gap:9px;margin-bottom:26px;font-size:13px;color:var(--muted)}
+  .status .pulse{width:8px;height:8px;border-radius:50%;background:var(--accent);position:relative}
+  .status .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--accent);opacity:.5;animation:pulse 2.4s ease-out infinite}
+  @keyframes pulse{0%{transform:scale(.6);opacity:.6}100%{transform:scale(1.6);opacity:0}}
+  h1.hero-title{
+    font-family:var(--serif);font-weight:500;font-size:clamp(38px,5.4vw,60px);
+    line-height:1.06;letter-spacing:-.018em;color:var(--ink);
+  }
+  h1.hero-title em{font-style:italic;color:var(--accent)}
+  .standfirst{margin-top:24px;font-size:18.5px;line-height:1.6;color:var(--ink-2);max-width:560px}
+  .standfirst b{font-weight:600;color:var(--ink)}
+  .hero-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px}
+  .hero-meta{display:flex;gap:34px;margin-top:42px;padding-top:30px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .hm .v{font-family:var(--serif);font-size:26px;font-weight:600;line-height:1}
+  .hm .k{font-size:12.5px;color:var(--muted);margin-top:7px}
+
+  /* figure card */
+  figure.fig{
+    margin:0;background:var(--surface);border:1px solid var(--line);border-radius:5px;
+    padding:24px 24px 18px;box-shadow:0 24px 60px -40px rgba(20,30,28,.5);
+  }
+  figure.fig .fhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  figure.fig .fhead .ttl{font-family:var(--serif);font-size:16px;font-weight:600}
+  figure.fig .fhead .mdl{font-size:11.5px;color:var(--faint);letter-spacing:.04em}
+  figcaption{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.5}
+  figcaption b{color:var(--ink-2);font-weight:600}
+
+  /* ---------- SECTION FRAME ---------- */
+  section{padding:80px 0;border-top:1px solid var(--line)}
+  .sec-head{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:start;margin-bottom:48px}
+  .sec-no{font-family:var(--serif);font-size:15px;color:var(--accent);font-weight:600;padding-top:8px;font-variant-numeric:tabular-nums}
+  .sec-head h2{font-family:var(--serif);font-weight:500;font-size:clamp(27px,3.6vw,40px);line-height:1.1;letter-spacing:-.012em;max-width:18ch}
+  .sec-head .intro{margin-top:14px;font-size:16.5px;color:var(--muted);max-width:60ch}
+
+  /* about */
+  .about{display:grid;grid-template-columns:1.45fr 1fr;gap:56px}
+  .about .prose p{color:var(--ink-2);font-size:17px;margin-bottom:18px;line-height:1.68}
+  .about .prose p:first-child{font-size:19px}
+  .about .prose strong{font-weight:600;color:var(--ink)}
+  .about .prose em{font-style:italic}
+  .profile{border-left:1px solid var(--line-2);padding-left:28px}
+  .profile .row{padding:15px 0;border-bottom:1px solid var(--line)}
+  .profile .row:first-child{padding-top:0}
+  .profile .row:last-child{border-bottom:0}
+  .profile .k{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .profile .v{font-size:15.5px;color:var(--ink);margin-top:4px;font-weight:500}
+
+  /* services */
+  .svc-groups{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 48px}
+  .grp{padding:22px 0;border-top:1px solid var(--line)}
+  .grp > .gh{display:flex;align-items:baseline;gap:12px;margin-bottom:8px}
+  .grp .gh .gi{font-family:var(--serif);font-size:13px;color:var(--accent);font-weight:600}
+  .grp .gh h3{font-family:var(--serif);font-size:21px;font-weight:600;letter-spacing:-.01em}
+  .grp ul{list-style:none}
+  .grp li{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:9px 0;border-bottom:1px dotted var(--line);font-size:15.5px}
+  .grp li:last-child{border-bottom:0}
+  .grp li .ro{color:var(--ink);font-weight:500}
+  .grp li .en{color:var(--faint);font-size:13px;font-style:italic;text-align:right;white-space:nowrap}
+  .tools-line{margin-top:40px;padding-top:24px;border-top:1px solid var(--line);font-size:15px;color:var(--muted);line-height:1.9}
+  .tools-line b{color:var(--ink);font-weight:600}
+  .tools-line .sep{color:var(--line-2);margin:0 10px}
+
+  /* publications */
+  .pubs{counter-reset:pub}
+  .pub{display:grid;grid-template-columns:auto 1fr auto;gap:26px;padding:28px 0;border-top:1px solid var(--line);align-items:start}
+  .pub:first-child{border-top:0}
+  .pub .idx{counter-increment:pub;font-family:var(--serif);font-size:15px;color:var(--accent);font-weight:600;padding-top:3px}
+  .pub .idx::before{content:"[" counter(pub) "]"}
+  .pub .body h3{font-family:var(--serif);font-size:21px;font-weight:600;line-height:1.28;letter-spacing:-.005em}
+  .pub .body .authors{font-size:14.5px;color:var(--ink-2);margin-top:8px}
+  .pub .body .authors b{font-weight:600}
+  .pub .body .venue{font-size:13.5px;color:var(--muted);margin-top:5px}
+  .pub .body .venue .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);border:1px solid var(--line-2);border-radius:2px;padding:2px 7px;margin-left:8px}
+  .pub .body p.desc{font-size:15px;color:var(--ink-2);margin-top:13px;line-height:1.6;max-width:70ch}
+  .pub .act{padding-top:3px}
+  .pub .act a{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;color:var(--accent);white-space:nowrap}
+  .pub .act a:hover{color:var(--accent-dk)}
+  .pub .act a .arr{transition:transform .2s}
+  .pub .act a:hover .arr{transform:translateX(3px)}
+  @media(max-width:760px){.pub{grid-template-columns:auto 1fr}.pub .act{grid-column:2}}
+
+  /* experience */
+  .xp{display:grid;grid-template-columns:1fr 1fr;gap:14px 48px}
+  .xp .item{padding:24px 0;border-top:1px solid var(--line)}
+  .xp .item .when{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
+  .xp .item h3{font-family:var(--serif);font-size:20px;font-weight:600;margin-top:8px;line-height:1.25}
+  .xp .item .org{font-size:14px;color:var(--muted);margin-top:3px}
+  .xp .item p{font-size:15px;color:var(--ink-2);margin-top:11px;line-height:1.6}
+
+  /* courses */
+  .courses{display:grid;grid-template-columns:repeat(2,1fr);gap:0 56px}
+  .courses .c{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--line)}
+  .courses .c .nm{font-size:15px;color:var(--ink);font-weight:500}
+  .courses .c .nm small{display:block;color:var(--muted);font-weight:400;font-size:13px;margin-top:2px}
+  .courses .c .yr{font-size:13px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  /* pricing */
+  .price-intro{font-size:15px;color:var(--muted);max-width:70ch;margin:-20px 0 30px}
+  .pricing{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line-2);border-radius:5px;overflow:hidden;background:var(--surface)}
+  .plan{padding:30px 28px;border-right:1px solid var(--line)}
+  .plan:last-child{border-right:0}
+  .plan.feat{background:var(--surface-2)}
+  .plan .pn{font-family:var(--serif);font-size:21px;font-weight:600}
+  .plan .pe{font-size:13px;color:var(--faint);font-style:italic;margin-top:2px}
+  .plan .amt{font-family:var(--serif);font-size:34px;font-weight:600;margin:20px 0 2px;letter-spacing:-.01em}
+  .plan .amt .cur{font-size:18px;color:var(--muted)}
+  .plan .pf{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
+  .plan ul{list-style:none;margin:20px 0 24px;display:flex;flex-direction:column;gap:11px}
+  .plan li{font-size:14.5px;color:var(--ink-2);display:flex;gap:11px;line-height:1.45}
+  .plan li::before{content:"";flex:0 0 6px;height:6px;margin-top:8px;background:var(--accent);border-radius:50%}
+  .plan .btn{width:100%;justify-content:center}
+  .extras{margin-top:26px;font-size:14.5px;color:var(--muted);line-height:1.8}
+  .extras b{color:var(--ink);font-weight:600}
+
+  /* contact */
+  #contact{border-top:1px solid var(--line)}
+  .contact{display:grid;grid-template-columns:1fr 1.05fr;gap:64px;align-items:start}
+  .contact .lead h2{font-family:var(--serif);font-weight:500;font-size:clamp(28px,4vw,42px);line-height:1.08;letter-spacing:-.015em}
+  .contact .lead p{font-size:17px;color:var(--ink-2);margin-top:18px;max-width:46ch}
+  .channels{margin-top:30px}
+  .channels a{display:flex;align-items:center;gap:16px;padding:16px 0;border-top:1px solid var(--line)}
+  .channels a:hover .cv{color:var(--accent)}
+  .channels a .ck{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);width:88px;font-weight:600}
+  .channels a .cv{font-size:16px;font-weight:500;transition:color .18s}
+  /* form */
+  form.contact-form{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:30px}
+  .fg{margin-bottom:18px}
+  .fg label{display:block;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+  .fg input,.fg select,.fg textarea{
+    width:100%;font-family:var(--sans);font-size:15px;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line-2);border-radius:3px;padding:12px 14px;transition:border .18s,box-shadow .18s;
+  }
+  .fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,110,94,.12)}
+  .fg textarea{resize:vertical;min-height:120px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  form .btn{width:100%;justify-content:center;margin-top:4px}
+  .form-note{font-size:13px;color:var(--muted);margin-top:14px;text-align:center}
+  .form-note a{color:var(--accent);font-weight:600}
+  .sent{display:none;font-size:14px;color:var(--accent-dk);background:rgba(15,110,94,.08);border:1px solid rgba(15,110,94,.25);border-radius:3px;padding:12px 14px;margin-top:14px}
+  .sent.show{display:block}
+
+  /* footer */
+  footer.site{border-top:1px solid var(--line);padding:40px 0;margin-top:0}
+  .foot{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+  .foot .nm{font-family:var(--serif);font-size:18px;font-weight:600}
+  .foot .meta{font-size:13px;color:var(--muted)}
+  .foot .meta a{color:var(--ink-2);font-weight:500}
+  .foot .meta a:hover{color:var(--accent)}
+
+  /* reveal */
+  .rv{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+  .rv.in{opacity:1;transform:none}
+
+  @media(max-width:920px){
+    .hero-grid{grid-template-columns:1fr;gap:46px}
+    .about,.contact{grid-template-columns:1fr;gap:40px}
+    .svc-groups,.xp,.courses{grid-template-columns:1fr;gap:0}
+    .pricing{grid-template-columns:1fr}
+    .plan{border-right:0;border-bottom:1px solid var(--line)}
+    .plan:last-child{border-bottom:0}
+    nav.main{display:none;position:absolute;top:70px;left:0;right:0;flex-direction:column;align-items:stretch;background:var(--surface);border-bottom:1px solid var(--line);padding:12px}
+    nav.main.open{display:flex}
+    nav.main a.lnk{padding:13px 12px}
+    nav.main a.lnk::after{display:none}
+    nav.main .btn{margin:8px 0 0}
+    .burger{display:flex}
+    .profile{border-left:0;padding-left:0;border-top:1px solid var(--line-2);padding-top:8px}
+  }
+  @media(max-width:560px){
+    .wrap{padding:0 20px}
+    section{padding:56px 0}
+    .sec-head{grid-template-columns:1fr;gap:6px}
+    .form-row{grid-template-columns:1fr}
+    .hero-meta{gap:24px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="site">
+  <div class="wrap head-inner">
+    <a class="logo" href="#top">
+      <span class="nm">Ioan-Matei Rusu</span>
+      <span class="rl">Biostatistician</span>
+    </a>
+    <button class="burger" id="burger" aria-label="Deschide meniul"><span></span></button>
+    <nav class="main" id="nav">
+      <a class="lnk" href="#despre">Despre</a>
+      <a class="lnk" href="#servicii">Servicii</a>
+      <a class="lnk" href="#publicatii">Publicații</a>
+      <a class="lnk" href="#experienta">Experiență</a>
+      <a class="lnk" href="#tarife">Tarife</a>
+      <a class="btn btn-primary btn-sm" href="#contact">Începe un proiect</a>
+    </nav>
+  </div>
+</header>
+
+<a id="top"></a>
+
+<!-- ============ HERO ============ -->
+<section class="hero" style="border-top:0">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="status"><span class="pulse"></span> Disponibil pentru proiecte &middot; Iași &amp; remote</span>
+      <h1 class="hero-title">Statistică riguroasă pentru cercetarea medicală, de la <em>ipoteză</em> la <em>publicare</em>.</h1>
+      <p class="standfirst">Sunt <b>Ioan-Matei Rusu</b>, student la Medicină la UMF „Grigore T. Popa” din Iași și cercetător la CEMEX. Proiectez studii, analizez date și scriu secțiunea de rezultate pentru lucrări de licență, disertații, teze de doctorat și articole — inclusiv <b>review-uri sistematice și metaanalize</b>. Lucrez reproductibil, în română și engleză.</p>
+      <div class="hero-actions">
+        <a href="#contact" class="btn btn-primary">Începe un proiect <span class="arr">→</span></a>
+        <a href="#servicii" class="btn btn-outline">Vezi serviciile</a>
+      </div>
+      <div class="hero-meta">
+        <div class="hm"><div class="v">4</div><div class="k">Articole &amp; metaanalize</div></div>
+        <div class="hm"><div class="v">R · Python · SPSS</div><div class="k">Instrumente principale</div></div>
+        <div class="hm"><div class="v">RO / EN</div><div class="k">Limbi de lucru</div></div>
+      </div>
+    </div>
+
+    <!-- FOREST PLOT FIGURE -->
+    <figure class="fig">
+      <div class="fhead">
+        <span class="ttl">Forest plot — efect combinat</span>
+        <span class="mdl">model cu efecte aleatorii</span>
+      </div>
+      <svg viewBox="0 0 540 350" width="100%" role="img" aria-label="Forest plot ilustrativ cu cinci studii și estimarea combinată">
+        <!-- no-effect line -->
+        <line x1="338" y1="40" x2="338" y2="300" stroke="#b4532a" stroke-width="1" stroke-dasharray="3 4" opacity=".75"/>
+        <text x="338" y="28" text-anchor="middle" font-family="Newsreader,serif" font-size="12" fill="#8b8f98">fără efect</text>
+
+        <!-- column headers -->
+        <text x="0" y="50" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#8b8f98" letter-spacing="1">STUDIU</text>
+        <text x="540" y="50" text-anchor="end" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#8b8f98" letter-spacing="1">POND.</text>
+
+        <!-- study rows -->
+        <g font-family="Newsreader,serif" font-size="14" fill="#33373f">
+          <text x="0" y="82">Studiul 1</text>
+          <text x="0" y="124">Studiul 2</text>
+          <text x="0" y="166">Studiul 3</text>
+          <text x="0" y="208">Studiul 4</text>
+          <text x="0" y="250">Studiul 5</text>
+        </g>
+        <g font-family="Inter,sans-serif" font-size="12" fill="#8b8f98" text-anchor="end">
+          <text x="540" y="82">18%</text>
+          <text x="540" y="124">11%</text>
+          <text x="540" y="166">26%</text>
+          <text x="540" y="208">15%</text>
+          <text x="540" y="250">22%</text>
+        </g>
+
+        <!-- CI whiskers + point estimates (square ~ weight) -->
+        <g stroke="#16181c" stroke-width="1.4">
+          <line x1="262" y1="78" x2="372" y2="78"/>
+          <line x1="300" y1="120" x2="392" y2="120"/>
+          <line x1="276" y1="162" x2="360" y2="162"/>
+          <line x1="320" y1="204" x2="426" y2="204"/>
+          <line x1="288" y1="246" x2="372" y2="246"/>
+        </g>
+        <g fill="#16181c">
+          <rect x="300" y="71" width="14" height="14"/>
+          <rect x="334" y="114" width="11" height="11"/>
+          <rect x="306" y="154" width="17" height="17"/>
+          <rect x="362" y="198" width="12" height="12"/>
+          <rect x="318" y="239" width="15" height="15"/>
+        </g>
+
+        <!-- pooled diamond -->
+        <polygon points="300,278 330,270 360,278 330,286" fill="#0f6e5e" stroke="#0a5042" stroke-width="1"/>
+        <text x="0" y="282" font-family="Newsreader,serif" font-size="14" font-weight="600" fill="#0f6e5e">Combinat</text>
+
+        <!-- axis -->
+        <line x1="240" y1="300" x2="440" y2="300" stroke="#d3cebd" stroke-width="1"/>
+        <g font-family="Inter,sans-serif" font-size="11" fill="#8b8f98" text-anchor="middle">
+          <line x1="262" y1="300" x2="262" y2="305" stroke="#d3cebd"/><text x="262" y="320">0.5</text>
+          <line x1="338" y1="300" x2="338" y2="305" stroke="#d3cebd"/><text x="338" y="320">1.0</text>
+          <line x1="420" y1="300" x2="420" y2="305" stroke="#d3cebd"/><text x="420" y="320">2.0</text>
+        </g>
+      </svg>
+      <figcaption><b>Fig. 1.</b> Reprezentare ilustrativă a unei sinteze de tip metaanaliză: pătratele = estimările studiilor (mărimea ∝ ponderea), liniile = intervalele de încredere, rombul = efectul combinat.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ DESPRE ============ -->
+<section id="despre">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="sec-no">01</div>
+      <div>
+        <h2>La intersecția dintre medicină, matematică și date</h2>
+        <p class="intro">Pregătire de matematică-informatică, studii de medicină și experiență de cercetare — pentru o statistică solidă, dar înțeleasă în context clinic.</p>
+      </div>
+    </div>
+    <div class="about">
+      <div class="prose rv">
+        <p>Sunt student la <strong>Facultatea de Medicină</strong> a Universității de Medicină și Farmacie „Grigore T. Popa” din Iași, admis cu media 9,80, după un parcurs de matematică-informatică la Colegiul Național „Emil Racoviță”.</p>
+        <p>Lucrez ca <strong>cercetător voluntar la CEMEX</strong> — Centrul Avansat de Cercetare-Dezvoltare în Medicină Experimentală, Iași — unde mă ocup de <strong>statistică și modelare matematică</strong> în proiecte interdisciplinare. Am fost coautor la metaanalize în oncologie și neuro-oncologie și la cadre teoretice de biofizică computațională.</p>
+        <p>Ofer servicii de <strong>biostatistică</strong> pentru studenți, doctoranzi și echipe de cercetare: de la alegerea testului potrivit și calculul mărimii eșantionului, până la metaanalize complete și redactarea metodologiei. Livrez analize <em>reproductibile</em> și interpretate clinic, pregătite să fie incluse direct în lucrare sau în manuscris.</p>
+      </div>
+      <aside class="profile rv">
+        <div class="row"><div class="k">Educație</div><div class="v">Medicină — UMF „Grigore T. Popa”, Iași</div></div>
+        <div class="row"><div class="k">Cercetare</div><div class="v">Cercetător voluntar · CEMEX Iași</div></div>
+        <div class="row"><div class="k">Specializare</div><div class="v">Biostatistică &amp; modelare matematică</div></div>
+        <div class="row"><div class="k">Metode</div><div class="v">Metaanalize · regresie · supraviețuire · ML</div></div>
+        <div class="row"><div class="k">Limbi</div><div class="v">Română · Engleză · Germană</div></div>
+        <div class="row"><div class="k">Mod de lucru</div><div class="v">Iași &amp; remote, în toată țara</div></div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SERVICII ============ -->
+<section id="servicii">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="sec-no">02</div>
+      <div>
+        <h2>Servicii de analiză statistică</h2>
+        <p class="intro">Acopăr întregul flux de cercetare cantitativă — fiecare metodă în română și engleză. Aleg împreună cu tine metoda corectă pentru designul studiului tău.</p>
+      </div>
+    </div>
+
+    <div class="svc-groups">
+      <div class="grp rv">
+        <div class="gh"><span class="gi">A</span><h3>Fundamente statistice</h3></div>
+        <ul>
+          <li><span class="ro">Statistică descriptivă</span><span class="en">Descriptive statistics</span></li>
+          <li><span class="ro">Statistică inferențială</span><span class="en">Inferential statistics</span></li>
+          <li><span class="ro">Testarea ipotezelor (t, ANOVA, χ²)</span><span class="en">Hypothesis testing</span></li>
+          <li><span class="ro">Teste non-parametrice</span><span class="en">Non-parametric tests</span></li>
+          <li><span class="ro">Mărimea eșantionului &amp; puterea</span><span class="en">Sample size &amp; power</span></li>
+        </ul>
+      </div>
+
+      <div class="grp rv">
+        <div class="gh"><span class="gi">B</span><h3>Regresie &amp; modelare</h3></div>
+        <ul>
+          <li><span class="ro">Corelație &amp; regresie liniară</span><span class="en">Correlation &amp; linear regression</span></li>
+          <li><span class="ro">Regresie logistică &amp; Poisson</span><span class="en">Logistic &amp; Poisson regression</span></li>
+          <li><span class="ro">Modele mixte / date longitudinale</span><span class="en">Mixed &amp; longitudinal models</span></li>
+          <li><span class="ro">Analiză multivariată (PCA, factor)</span><span class="en">Multivariate analysis</span></li>
+          <li><span class="ro">Analiza de supraviețuire (Cox, KM)</span><span class="en">Survival analysis</span></li>
+        </ul>
+      </div>
+
+      <div class="grp rv">
+        <div class="gh"><span class="gi">C</span><h3>Sinteza dovezilor</h3></div>
+        <ul>
+          <li><span class="ro">Review sistematic (PRISMA)</span><span class="en">Systematic review</span></li>
+          <li><span class="ro">Metaanaliză</span><span class="en">Meta-analysis</span></li>
+          <li><span class="ro">Metaanaliză în rețea</span><span class="en">Network meta-analysis</span></li>
+          <li><span class="ro">Heterogenitate &amp; bias (I², funnel)</span><span class="en">Heterogeneity &amp; bias</span></li>
+          <li><span class="ro">Forest &amp; funnel plots</span><span class="en">Forest &amp; funnel plots</span></li>
+        </ul>
+      </div>
+
+      <div class="grp rv">
+        <div class="gh"><span class="gi">D</span><h3>Metode avansate &amp; computaționale</h3></div>
+        <ul>
+          <li><span class="ro">Statistică bayesiană</span><span class="en">Bayesian statistics</span></li>
+          <li><span class="ro">Analiza seriilor de timp</span><span class="en">Time series analysis</span></li>
+          <li><span class="ro">Machine learning &amp; predicție</span><span class="en">Machine learning</span></li>
+          <li><span class="ro">Modelare matematică &amp; simulare</span><span class="en">Mathematical modeling</span></li>
+          <li><span class="ro">Analiză epidemiologică (OR, RR, ROC)</span><span class="en">Epidemiological analysis</span></li>
+        </ul>
+      </div>
+
+      <div class="grp rv">
+        <div class="gh"><span class="gi">E</span><h3>Date &amp; instrumente de măsurare</h3></div>
+        <ul>
+          <li><span class="ro">Chestionare: design &amp; validare</span><span class="en">Questionnaire validation</span></li>
+          <li><span class="ro">Fidelitate (alfa Cronbach)</span><span class="en">Reliability analysis</span></li>
+          <li><span class="ro">Curățarea &amp; gestionarea datelor</span><span class="en">Data cleaning &amp; management</span></li>
+          <li><span class="ro">Evaluarea testelor diagnostice</span><span class="en">Diagnostic accuracy</span></li>
+        </ul>
+      </div>
+
+      <div class="grp rv">
+        <div class="gh"><span class="gi">F</span><h3>Livrabile &amp; raportare</h3></div>
+        <ul>
+          <li><span class="ro">Vizualizare de date publicabilă</span><span class="en">Publication-ready figures</span></li>
+          <li><span class="ro">Rapoarte reproductibile</span><span class="en">Reproducible reports</span></li>
+          <li><span class="ro">Redactarea secțiunii „Rezultate”</span><span class="en">Results write-up</span></li>
+          <li><span class="ro">Răspuns la observațiile reviewerilor</span><span class="en">Reviewer response</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="tools-line rv"><b>Instrumente:</b> R (tidyverse, metafor) <span class="sep">·</span> Python (pandas, statsmodels, scikit-learn) <span class="sep">·</span> SPSS <span class="sep">·</span> STATA <span class="sep">·</span> GraphPad Prism <span class="sep">·</span> JASP <span class="sep">·</span> RevMan <span class="sep">·</span> Excel</p>
+  </div>
+</section>
+
+<!-- ============ PUBLICATII ============ -->
+<section id="publicatii">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="sec-no">03</div>
+      <div>
+        <h2>Publicații &amp; cercetare</h2>
+        <p class="intro">Coautor la review-uri sistematice și metaanalize din oncologie și neuro-oncologie, precum și la cadre teoretice de biofizică computațională.</p>
+      </div>
+    </div>
+
+    <div class="pubs">
+      <article class="pub rv">
+        <div class="idx"></div>
+        <div class="body">
+          <h3>MRI-Based Brain Signatures of Chemotherapy-Induced Peripheral Neuropathy in Cancer Patients: A Systematic Review and Meta-Analysis</h3>
+          <div class="authors"><b>Rusu I.-M.</b> și colaboratorii</div>
+          <div class="venue"><em>Diagnostics</em> (MDPI), 2026 · DOI 10.3390/diagnostics16111619 <span class="tag">Review sistematic &amp; metaanaliză</span></div>
+          <p class="desc">Sinteză conform PRISMA 2020 a studiilor de neuroimagistică (fMRI, MRI structural și de perfuzie) la pacienți oncologici cu neuropatie periferică indusă de chimioterapie. Date combinate prin estimarea probabilității de activare (ALE), cartografiere ROI la nivel de sisteme și metaanaliză de proporții, evidențiind alterări consistente în rețeaua de mod implicit și în cortexul prefrontal și senzitivo-motor.</p>
+        </div>
+        <div class="act"><a href="https://doi.org/10.3390/diagnostics16111619" target="_blank" rel="noopener">Vizualizează <span class="arr">→</span></a></div>
+      </article>
+
+      <article class="pub rv">
+        <div class="idx"></div>
+        <div class="body">
+          <h3>Cannabinoids and opioid consumption in cancer pain: a systematic review and meta-analysis</h3>
+          <div class="authors"><b>Rusu I.-M.</b> și colaboratorii</div>
+          <div class="venue">Review sistematic &amp; metaanaliză, 2025 <span class="tag">Oncologie · durere</span></div>
+          <p class="desc">Evaluare sistematică și cantitativă a efectului canabinoizilor asupra consumului de opioide în managementul durerii oncologice, prin combinarea rezultatelor studiilor existente, evaluarea heterogenității și a riscului de bias.</p>
+        </div>
+        <div class="act"><a href="https://www.researchgate.net/publication/406478712_Cannabinoids_and_opioid_consumption_in_cancer_pain_a_systematic_review_and_meta-analysis" target="_blank" rel="noopener">Vizualizează <span class="arr">→</span></a></div>
+      </article>
+
+      <article class="pub rv">
+        <div class="idx"></div>
+        <div class="body">
+          <h3>A hypothesis-driven theoretical framework for a learnable geometric functional in mutation-conditioned ligand–receptor affinity prediction</h3>
+          <div class="authors"><b>Rusu I.-M.</b>, Margineanu J., Maxim Ș.-R., Magop R., Smau G., Rotaru R., Tamba I.-B.</div>
+          <div class="venue"><em>Therapeutics, Pharmacology and Clinical Toxicology</em>, sept. 2025 <span class="tag">Biofizică computațională</span></div>
+          <p class="desc">Cadru interpretabil care descompune predicția afinității de legare într-o componentă geometrică (funcționale învățabile, invariante la rotație și translație) și una energetică (rețea de tip graf). Un mecanism condiționat de mutații permite adaptarea la variante de receptor fără recalcule cuantice — relevant pentru medicina personalizată.</p>
+        </div>
+        <div class="act"><a href="https://therapeutics.ro/a-hypothesis-driven-theoretical-framework-for-a-learnable-geometric-functional-in-mutation-conditioned-ligand-receptor-affinity-prediction/" target="_blank" rel="noopener">Vizualizează <span class="arr">→</span></a></div>
+      </article>
+
+      <article class="pub rv">
+        <div class="idx"></div>
+        <div class="body">
+          <h3>Entropy-controlled free energy models for protein folding under cellular-like conditions: a conceptual framework</h3>
+          <div class="authors"><b>Rusu I.-M.</b>, Margineanu J., Maxim Ș.-R., Magop R., Creanga-Murariu I., Tamba I.-B.</div>
+          <div class="venue"><em>Therapeutics, Pharmacology and Clinical Toxicology</em>, dec. 2025 <span class="tag">Termodinamică · geometria informației</span></div>
+          <p class="desc">Cadru conceptual în care energia liberă Helmholtz de pliere este descompusă într-un termen de entropie internă și contribuții externe (aglomerare celulară, osmoliți), folosind geometria informației și metrica Fisher pentru a modela stabilitatea proteinelor.</p>
+        </div>
+        <div class="act"><a href="https://therapeutics.ro/entropy-controlled-free-energy-models-for-protein-folding-under-cellular-like-conditions-a-conceptual-framework/" target="_blank" rel="noopener">Vizualizează <span class="arr">→</span></a></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EXPERIENTA ============ -->
+<section id="experienta">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="sec-no">04</div>
+      <div>
+        <h2>Experiență &amp; proiecte</h2>
+        <p class="intro">Cercetare aplicată în biostatistică, modelare matematică și analiză de date clinice.</p>
+      </div>
+    </div>
+    <div class="xp">
+      <div class="item rv">
+        <div class="when">Prezent</div>
+        <h3>Cercetător voluntar — Statistică &amp; modelare matematică</h3>
+        <div class="org">CEMEX — Centrul Avansat de Cercetare-Dezvoltare în Medicină Experimentală, Iași</div>
+        <p>Analiză statistică și modelare matematică în proiecte interdisciplinare, la intersecția dintre medicină, inteligență artificială, neuroștiințe și matematică.</p>
+      </div>
+      <div class="item rv">
+        <div class="when">2024 — prezent</div>
+        <h3>Cercetător-student — Biostatistică &amp; fizică medicală</h3>
+        <div class="org">Centrul Avansat de Cercetare-Dezvoltare în Medicină Experimentală, Iași</div>
+        <p>Programare și analiză de date pentru cercetare care leagă tehnologia de practica medicală, cu accent pe modelarea sistemelor biologice complexe.</p>
+      </div>
+      <div class="item rv">
+        <div class="when">Aprilie 2025</div>
+        <h3>Membru — Cercetare exploratorie privind bolile cardiovasculare profesionale</h3>
+        <div class="org">SCR — Spitalul Clinic de Recuperare, Iași</div>
+        <p>Analiza datelor cantitative la nivelul UE privind tipurile, amploarea și cauzele bolilor cardiovasculare legate de muncă și grupurile de lucrători expuse riscului.</p>
+      </div>
+      <div class="item rv">
+        <div class="when">Prezent</div>
+        <h3>Biostatistician freelance</h3>
+        <div class="org">Iași / remote</div>
+        <p>Modele statistice și matematice aplicate la probleme reale din sănătate, de la analiza datelor clinice la simulări; unelte proprii dezvoltate în C++ și Python.</p>
+      </div>
+    </div>
+
+    <!-- courses -->
+    <div style="margin-top:54px">
+      <div class="label rv" style="margin-bottom:18px">Cursuri &amp; certificări selectate</div>
+      <div class="courses">
+        <div class="c rv"><div class="nm">Integral Calculus through Data and Modeling — Specialization<small>Johns Hopkins University</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Differential Calculus through Data and Modeling<small>Johns Hopkins University</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Expressway to Data Science: Essential Math<small>University of Colorado Boulder</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Mathematics for Machine Learning: Multivariate Calculus<small>Imperial College London</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Neural Networks and Deep Learning<small>DeepLearning.AI</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Data Analysis with Python<small>IBM</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Databases and SQL for Data Science with Python<small>IBM</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Python for Data Science, AI &amp; Development<small>IBM</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">DFT Atomistic Calculations &amp; Machine Learning Techniques<small>Workshop practic</small></div><div class="yr">2024</div></div>
+        <div class="c rv"><div class="nm">Database Programming with SQL · Database Foundations<small>Oracle</small></div><div class="yr">2023</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TARIFE ============ -->
+<section id="tarife">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="sec-no">05</div>
+      <div>
+        <h2>Tarife orientative</h2>
+        <p class="intro">Prima discuție (20–30 min) este gratuită: stabilim obiectivele și primești o ofertă fermă, fără obligații. Reduceri pentru studenți și colaborări recurente.</p>
+      </div>
+    </div>
+    <p class="price-intro rv">Valorile de mai jos sunt orientative și se adaptează la complexitatea analizei, volumul datelor și termenul de livrare.</p>
+
+    <div class="pricing rv">
+      <div class="plan">
+        <div class="pn">Consultanță</div>
+        <div class="pe">Consulting &amp; support</div>
+        <div class="amt"><span class="cur">de la</span> 120 <span class="cur">RON/oră</span></div>
+        <div class="pf">Ședință de lucru</div>
+        <ul>
+          <li>Alegerea testelor &amp; design de studiu</li>
+          <li>Calculul mărimii eșantionului</li>
+          <li>Interpretarea rezultatelor existente</li>
+          <li>Răspuns la reviewer</li>
+        </ul>
+        <a href="#contact" class="btn btn-outline">Programează o discuție</a>
+      </div>
+
+      <div class="plan feat">
+        <div class="pn">Lucrare academică</div>
+        <div class="pe">Thesis / dissertation</div>
+        <div class="amt"><span class="cur">de la</span> 450 <span class="cur">RON</span></div>
+        <div class="pf">Licență · Master · Doctorat</div>
+        <ul>
+          <li>Licență — de la 450 RON</li>
+          <li>Disertație / master — de la 650 RON</li>
+          <li>Doctorat — de la 1200 RON</li>
+          <li>Analiză completă + figuri publicabile</li>
+          <li>Secțiunea „Rezultate” redactată</li>
+        </ul>
+        <a href="#contact" class="btn btn-primary">Cere o ofertă <span class="arr">→</span></a>
+      </div>
+
+      <div class="plan">
+        <div class="pn">Metaanaliză &amp; articol</div>
+        <div class="pe">Meta-analysis &amp; manuscript</div>
+        <div class="amt"><span class="cur">de la</span> 900 <span class="cur">RON</span></div>
+        <div class="pf">Sinteza dovezilor</div>
+        <ul>
+          <li>Metaanaliză / review — de la 1000 RON</li>
+          <li>Metaanaliză în rețea — la cerere</li>
+          <li>Secțiune statistică articol — de la 800 RON</li>
+          <li>Forest/funnel plots &amp; I²</li>
+          <li>Metodologie reproductibilă</li>
+        </ul>
+        <a href="#contact" class="btn btn-outline">Discută proiectul</a>
+      </div>
+    </div>
+
+    <p class="extras rv"><b>Servicii punctuale:</b> calcul mărime eșantion &amp; putere — de la 200 RON · vizualizare de date / figuri — de la 150 RON · curățarea bazei de date — de la 200 RON · modelare matematică, simulare &amp; machine learning — ofertă personalizată.</p>
+  </div>
+</section>
+
+<!-- ============ CONTACT ============ -->
+<section id="contact">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div class="sec-no">06</div>
+      <div>
+        <h2>Contact</h2>
+        <p class="intro">Spune-mi pe scurt despre proiect și primești o evaluare în aceeași zi.</p>
+      </div>
+    </div>
+    <div class="contact">
+      <div class="lead rv">
+        <h2 class="serif" style="font-size:clamp(24px,3vw,32px);font-weight:500;line-height:1.12;letter-spacing:-.01em">Hai să discutăm despre datele tale.</h2>
+        <p>Trimite-mi tema, obiectivele și (dacă ai) baza de date. Îți răspund cu o evaluare și o ofertă orientativă, de regulă în aceeași zi.</p>
+        <div class="channels">
+          <a href="mailto:rusuioanmatei@gmail.com"><span class="ck">Email</span><span class="cv">rusuioanmatei@gmail.com</span></a>
+          <a href="tel:+40786229696"><span class="ck">Telefon</span><span class="cv">0786 229 696</span></a>
+          <a href="https://www.linkedin.com/in/ioan-matei-964b822a9" target="_blank" rel="noopener"><span class="ck">LinkedIn</span><span class="cv">Ioan-Matei Rusu</span></a>
+          <a href="#"><span class="ck">Locație</span><span class="cv">Iași, România &middot; remote</span></a>
+        </div>
+      </div>
+
+      <form class="contact-form rv" id="contactForm">
+        <div class="form-row">
+          <div class="fg">
+            <label for="nume">Nume</label>
+            <input type="text" id="nume" name="nume" placeholder="Numele tău" required />
+          </div>
+          <div class="fg">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="adresa@email.com" required />
+          </div>
+        </div>
+        <div class="fg">
+          <label for="tip">Tipul proiectului</label>
+          <select id="tip" name="tip">
+            <option>Analiză — lucrare de licență</option>
+            <option>Analiză — disertație / master</option>
+            <option>Analiză — teză de doctorat</option>
+            <option>Metaanaliză / review sistematic</option>
+            <option>Secțiune statistică pentru articol</option>
+            <option>Consultanță / ședință de lucru</option>
+            <option>Modelare matematică / machine learning</option>
+            <option>Altceva</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label for="mesaj">Detalii</label>
+          <textarea id="mesaj" name="mesaj" placeholder="Tema, obiectivele, termenul-limită, ce date ai..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Trimite mesajul <span class="arr">→</span></button>
+        <div class="sent" id="sent">Se deschide aplicația ta de email cu mesajul precompletat. Dacă nu pornește, scrie direct la <a href="mailto:rusuioanmatei@gmail.com">rusuioanmatei@gmail.com</a>.</div>
+        <p class="form-note">Sau scrie direct la <a href="mailto:rusuioanmatei@gmail.com">rusuioanmatei@gmail.com</a></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site">
+  <div class="wrap foot">
+    <div class="nm">Ioan-Matei Rusu</div>
+    <div class="meta">Biostatistică &amp; modelare matematică · Iași &nbsp;·&nbsp; <a href="mailto:rusuioanmatei@gmail.com">rusuioanmatei@gmail.com</a> &nbsp;·&nbsp; © <span id="yr"></span></div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // mobile nav
+  var burger = document.getElementById('burger');
+  var nav = document.getElementById('nav');
+  burger.addEventListener('click', function(){ nav.classList.toggle('open'); });
+  nav.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', function(){ nav.classList.remove('open'); }); });
+
+  // reveal on scroll
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:.12, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.rv').forEach(function(el){ io.observe(el); });
+
+  // contact form -> compose email
+  var form = document.getElementById('contactForm');
+  var sent = document.getElementById('sent');
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var nume = document.getElementById('nume').value.trim();
+    var email = document.getElementById('email').value.trim();
+    var tip = document.getElementById('tip').value;
+    var mesaj = document.getElementById('mesaj').value.trim();
+    var subject = 'Proiect statistică — ' + tip + (nume ? ' (' + nume + ')' : '');
+    var body =
+      'Nume: ' + nume + '\n' +
+      'Email: ' + email + '\n' +
+      'Tip proiect: ' + tip + '\n\n' +
+      'Detalii:\n' + mesaj + '\n';
+    sent.classList.add('show');
+    window.location.href = 'mailto:rusuioanmatei@gmail.com?subject=' +
+      encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  });
+</script>
+</body>
+</html>
