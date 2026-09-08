@@ -4,8 +4,35 @@ Prototip vizual pentru **Pacifer**, un joc open-world pixel art în care un căl
 consilierul împăratului și rezolvă conflictele economice și sociale ale imperiului.
 Ținta finală este Android (HTML5 Canvas împachetat cu Capacitor).
 
-Acest folder conține **doar** asset-urile gratuite selectate și un generator de scenă de test.
-Nu există încă logică de joc.
+Acest folder conține asset-urile gratuite selectate și un **prototip jucabil** de motor:
+hartă din tile-uri, strat de obiecte cu coliziuni, personaje animate, dialog cu alegeri,
+controale touch. Se deschide direct în browser: `pacifer/index.html` (pe GitHub Pages sau local
+cu `python3 -m http.server` din rădăcina repo-ului, fiindcă `fetch` nu merge de pe `file://`).
+
+## Controale
+
+- Desktop: săgeți sau WASD pentru mers, `E` / `Enter` / `Space` pentru acțiune (vorbește, ușă),
+  săgeți sus/jos pentru alegerea răspunsului, `C` pentru cutiile de coliziune.
+- Touch (Android): atinge și trage oriunde în stânga ecranului pentru joystick, butonul `E` pentru
+  acțiune, butonul `C` pentru coliziuni, atingere pe caseta de dialog pentru a continua, atingere
+  pe un răspuns pentru a-l alege.
+
+## Cum e construit motorul (`game.js`)
+
+- **Harta**: grilă de 40×30 tile-uri (iarbă / pământ / apă). Marginile dintre iarbă și pământ sau apă
+  se aleg automat, pe sferturi de tile, din setul de autotile al foii `terrain_spring.png`.
+  Harta se randează o singură dată într-un canvas ascuns.
+- **Obiecte**: fiecare obiect (palat, casă, copac, fântână, felinar, butoi, gard, pod…) este un sprite
+  separat din `assets/objects/` cu o **cutie de coliziune** proprie definită în `objects.json`
+  (câmpul `col`, relativ la colțul stânga-sus al sprite-ului). Ușile au `door`, podul are `walkable`
+  (zonă de apă pe care se poate merge). Obiectele se plasează în `OBJECT_PLACEMENTS` în coordonate de tile.
+- **Personaje**: foi LPC complete (4 direcții × 9 cadre), cutie de coliziune la picioare (24×16 px),
+  mișcare separată pe axe pentru alunecare pe lângă obstacole. Personajele și obiectele se desenează
+  sortate după marginea de jos, deci jucătorul trece corect în spatele și în fața lor.
+- **Camera** urmărește jucătorul și se oprește la marginile hărții. Scala se alege ca număr întreg
+  în funcție de ecran, pentru pixeli curați.
+- **Dialog**: liniile și alegerile sunt în `DIALOGS`; o alegere aplică efecte asupra indicatorilor
+  (trezorerie, stabilitate, hrană) afișați în colțul din stânga-sus.
 
 ## Structură
 
@@ -17,10 +44,12 @@ Nu există încă logică de joc.
   Licențe mixte per piesă, vezi `CREDITS.md`.
 - `assets/ninja-adventure/` – caseta de dialog, rama de portret, săgeata și fontul 8×8 din
   [Ninja Adventure](https://github.com/sparklinlabs/superpowers-asset-packs) de Pixel-boy. Licență CC0.
-- `tools/build_scene.py` – compune scena de test din asset-uri (autotile iarbă/pământ/apă,
-  clădiri, personaje stratificate, dialog). Rulare: `pip install pillow && python3 tools/build_scene.py`.
-- `preview/scene.png`, `preview/characters.png` – rezultatul generatorului.
-- `index.html` – pagină simplă care afișează previzualizarea.
+- `assets/objects/` – sprite-urile obiectelor de joc, câte unul per obiect, plus `objects.json`
+  cu dimensiuni și cutii de coliziune. Generate de `tools/export_objects.py`.
+- `assets/characters/` – foile de animație gata compuse pentru călugăr, împărat, gardian, sătean.
+  Generate de același script.
+- `index.html`, `game.js` – jocul.
+- `tools/build_scene.py` – generatorul primei imagini de test (`preview/`), păstrat ca referință.
 
 ## Personaje compuse (ordinea straturilor)
 
@@ -32,6 +61,7 @@ de două culori (funcția `tint`).
 
 ## Pași următori propuși
 
-1. Motor HTML5 Canvas: hartă din tile-uri, mers în 4 direcții, coliziuni, cameră.
-2. Sistem de dialog cu alegeri și indicatori ai imperiului (trezorerie, stabilitate, hrană, loialitate).
-3. Împachetare Android cu Capacitor.
+1. Editor de hartă sau format de hartă în JSON (Tiled), ca să nu mai plasăm obiectele din cod.
+2. Interioare (palat, case) cu tranziții prin uși; mai multe regiuni ale imperiului.
+3. Sistemul de quest-uri și indicatori pe provincii; salvare în browser.
+4. Împachetare Android cu Capacitor (ecran complet, orientare, icoană).
