@@ -10,11 +10,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 A = os.path.join(HERE, '..', 'assets')
 LPC = os.path.join(A, 'lpc-revised'); U = os.path.join(A, 'ulpc')
 OBJ = os.path.join(A, 'objects'); CH = os.path.join(A, 'characters')
-os.makedirs(OBJ, exist_ok=True); os.makedirs(CH, exist_ok=True)
+DATA = os.path.join(HERE, '..', 'data')
+os.makedirs(OBJ, exist_ok=True); os.makedirs(CH, exist_ok=True); os.makedirs(DATA, exist_ok=True)
 T = 32
 
 def load(p): return Image.open(p).convert('RGBA')
 def tile(sheet, tx, ty, w=1, h=1): return sheet.crop((tx*T, ty*T, (tx+w)*T, (ty+h)*T))
+
+def tint(img, dark, light):
+    out = img.copy(); px = out.load()
+    for yy in range(out.height):
+        for xx in range(out.width):
+            r, g, b, a = px[xx, yy]
+            if a == 0: continue
+            l = min(1, (0.3*r + 0.59*g + 0.11*b) / 255 * 1.25)
+            px[xx, yy] = tuple(int(dark[i] + (light[i]-dark[i]) * l) for i in range(3)) + (a,)
+    return out
 
 objects = {}
 def save(name, img, col, **extra):
@@ -67,19 +78,37 @@ plants = load(f'{LPC}/Terrain/plants_spring.png')
 for i in range(4): save(f'bush{i+1}', tile(plants, i, 0), [2, 8, 28, 22])
 save('rock', load(f'{LPC}/Terrain/Rocks, Grasslands.png').crop((96, 96, 160, 128)), [4, 8, 56, 22])
 save('bridge', load(f'{LPC}/Structure/Bridges/Wood Bridge A - Rails.png').crop((128, 0, 224, 64)), None, walkable=[0, 0, 96, 64])
+
+# ---- obiecte de interior ----
+thrones = load(f'{LPC}/Objects/Furniture/Seating/Thrones.png')
+save('throne', thrones.crop((0, 0, 32, 64)), [2, 34, 28, 26])
+tables = load(f'{LPC}/Objects/Furniture/Table, Ornate Wood.png')
+save('table_big', tables.crop((3*T, 2*T, 6*T, 4*T)), [0, 6, 96, 52])
+chairs = load(f'{LPC}/Objects/Furniture/Seating/Chair, Dining A.png')
+save('chair', chairs.crop((0, 0, 32, 32)), [4, 14, 24, 16])
+save('chair2', chairs.crop((0, 4*T, 32, 5*T)), [4, 14, 24, 16])
+rug = load(f'{LPC}/Objects/Furniture/Rugs/Swirling Vine Rug.png')
+save('rug', tint(rug.crop((0, 2*T, 5*T, 4*T)), (86, 14, 22), (196, 62, 60)), None, flat=True)
+save('fireplace', load(f'{LPC}/Objects/Furniture/Fireplace.png').crop((3*T, 0, 6*T, 3*T)), [4, 48, 88, 44])
+save('shelf', load(f'{LPC}/Objects/Furniture/Shelf.png').crop((0, 0, 3*T, T)), None, flat=True)
+save('chest', load(f'{LPC}/Objects/Furniture/Chest.png').crop((0, 2*T, 32, 3*T)), [3, 12, 26, 18])
+pillar = pillars.crop((96, 0, 128, 96))
+save('pillar', pillar, [6, 62, 20, 30])
+
+# torta de perete: 3 cadre de animatie (coloanele 2..4 din foaie), lipite orizontal
+wl = load(f'{LPC}/Objects/Wall Items/Lighting, Wall.png')
+torch = Image.new('RGBA', (3*T, 2*T), (0, 0, 0, 0))
+for i, col in enumerate((2, 3, 4)):
+    torch.alpha_composite(wl.crop((col*T, 0, (col+1)*T, 2*T)), (i*T, 0))
+save('torch', torch, None, anim={'frames': 3, 'w': T, 'h': 2*T, 'fps': 6}, flat=True)
+
 json.dump(objects, open(os.path.join(OBJ, 'objects.json'), 'w'), indent=1)
+# acelasi continut ca fisier .js, ca jocul sa mearga si deschis direct de pe disc (file://)
+with open(os.path.join(DATA, 'objects.js'), 'w') as f:
+    f.write('/* GENERAT de tools/export_objects.py - nu edita manual */\n')
+    f.write('window.PACIFER_OBJECTS = ' + json.dumps(objects, indent=1, ensure_ascii=False) + ';\n')
 
 # ---- characters: full walk sheets (4 rows x 9 frames, 64x64) ----
-def tint(img, dark, light):
-    out = img.copy(); px = out.load()
-    for yy in range(out.height):
-        for xx in range(out.width):
-            r, g, b, a = px[xx, yy]
-            if a == 0: continue
-            l = min(1, (0.3*r + 0.59*g + 0.11*b) / 255 * 1.25)
-            px[xx, yy] = tuple(int(dark[i] + (light[i]-dark[i]) * l) for i in range(3)) + (a,)
-    return out
-
 def sheet(parts):
     out = Image.new('RGBA', (576, 256), (0, 0, 0, 0))
     for p in parts:

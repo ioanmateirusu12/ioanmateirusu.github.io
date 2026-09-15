@@ -9,12 +9,16 @@
 <style>
   html,body{margin:0;height:100%;background:#1d1c22;overflow:hidden;overscroll-behavior:none}
   canvas{display:block;touch-action:none;image-rendering:pixelated;image-rendering:crisp-edges}
-  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#eae6dc;font-family:system-ui,sans-serif;font-size:14px;pointer-events:none}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#eae6dc;font-family:system-ui,sans-serif;font-size:14px;pointer-events:none;text-align:center;padding:0 16px}
 </style>
 </head>
 <body>
   <canvas id="game"></canvas>
   <div id="loading">Se încarcă Pacifer…</div>
+  <!-- datele jocului: fisiere .js, ca sa mearga si deschis direct de pe disc (file://) -->
+  <script src="data/objects.js"></script>
+  <script src="data/world.js"></script>
+  <script src="data/dialogs.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

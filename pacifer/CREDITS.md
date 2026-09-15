@@ -10,7 +10,9 @@ Toate asset-urile sunt gratuite, dar cele din LPC cer **creditarea autorilor** �
 - Compilat de Eliza Wyatt (DeathsDarling). Artiști: Eliza Wyatt (DeathsDarling), Lanea Zimmerman (Sharm),
   Stephen Challener (Redshrike), Johannes Sjölund (Wulax), BlueCarrot16, BenCreating, Durrani, YuriNikolai,
   Hyptosis, Craftpix.net 2D Game Assets.
-- Detaliile per fișier sunt în fișierele `Credits.txt` copiate lângă fiecare foaie de sprite-uri.
+- Detaliile per fișier sunt în fișierele `Credits.txt` copiate lângă fiecare foaie de sprite-uri,
+  inclusiv pentru piesele de interior (podele, pereți de cărămidă, tronuri, scaune, mese, covoare,
+  șemineu, rafturi, lăzi, torțe de perete).
 
 ## Universal LPC Spritesheet Character Generator (`assets/ulpc/`)
 

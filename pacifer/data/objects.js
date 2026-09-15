@@ -1,4 +1,5 @@
-{
+/* GENERAT de tools/export_objects.py - nu edita manual */
+window.PACIFER_OBJECTS = {
  "tree1": {
   "file": "tree1.png",
   "w": 96,
@@ -386,4 +387,4 @@
   },
   "flat": true
  }
-}
+};
