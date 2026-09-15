@@ -1,57 +1,83 @@
 /* Pacifer - game engine (HTML5 Canvas)
  *
  * The content lives in data/, not in here:
- *   data/objects.js  - one sprite + collision box per object (generated)
- *   data/world.js    - the maps: terrain, objects, characters, doorways
+ *   data/objects.js  - what can stand in the world, and where its sprite is
+ *   data/world.js    - the maps: ground, objects, characters, doorways
  *   data/dialogs.js  - what the characters say
  * They are .js files rather than .json so the game also runs when index.html is
  * opened straight off the disk, with no local server.
  *
- * The engine itself: several maps (outdoor terrain that auto-tiles its own edges,
- * indoor rooms whose walls are generated around a floor rectangle), an object
- * layer with per-object collision, animated LPC characters, a camera, a virtual
- * joystick, and a dialogue system whose choices move the realm's stats.
+ * The art is 16-pixel tiles drawn at an integer zoom of 3 or more. That is what
+ * makes the pixels read as pixels, and it is also why so much of the world fits
+ * on screen at once: the camera sits far back, and a person is one tile tall.
  */
 'use strict';
 
-const T = 32;
-const ASSETS = 'assets/';
+const T = 16;                      // one tile, in world pixels
+const ASSETS = 'assets/pixelboy/';
 const WORLD = window.PACIFER_WORLD;
 const OBJECTS = window.PACIFER_OBJECTS;
 const SCRIPT = window.PACIFER_DIALOGS;
 
-// Outdoor ground types. `plain` lists interchangeable fill tiles; `edge` is the
-// [3x3 outer block, 2x2 inner corners] pair used to blend grass into this type.
-// `sheet` names the image the fill tiles come from (the terrain sheet by default).
+/* Ground. Grass is the base everything sits on. Every other kind of ground is an
+ * outlined block of nine tiles: the engine picks corner, edge or middle from what
+ * the neighbours are, so a lake or a courtyard draws its own outline. Roads are
+ * different - they are one tile wide and pick their piece from which way the road
+ * continues, so junctions and corners come out right. */
 const GROUND = {
-  grass: { id: 0, plain: [[3, 1], [4, 1], [5, 1], [3, 2], [4, 2], [5, 2]] },
-  dirt:  { id: 1, plain: [[3, 3], [4, 3], [5, 3], [3, 4], [4, 4], [5, 4]], edge: [[6, 0], [6, 3]] },
-  sand:  { id: 2, plain: [[3, 5], [4, 5], [5, 5], [3, 6], [4, 6], [5, 6]], edge: [[6, 5], [6, 8]] },
-  water: { id: 3, plain: [[12, 16], [13, 16], [14, 16], [15, 16], [12, 17], [13, 17], [14, 17], [15, 17]],
-           edge: [[3, 10], [0, 13]], solid: true },
-  stone: { id: 4, sheet: 'paving', plain: [[0, 0], [0, 1], [0, 2]], edge: [[9, 0], [9, 3]] },
+  // `alt` are stand-ins for the middle tile, sprinkled at `altRate`, so a large
+  // field of one ground does not read as a slab of flat colour. The tileset keeps
+  // them in the column just right of each block.
+  grass: { id: 0, sheet: 'medieval', block: [0, 0], alt: [[3, 0], [3, 1]], altRate: 0.14 },
+  water: { id: 1, sheet: 'medieval', block: [16, 0], solid: true },
+  stone: { id: 2, sheet: 'medieval', block: [12, 0] },
+  wood:  { id: 3, sheet: 'medieval', block: [4, 0], alt: [[7, 0], [7, 1]], altRate: 0.18 },
+  earth: { id: 4, sheet: 'medieval', block: [8, 0], alt: [[11, 1], [11, 2]], altRate: 0.16 },
+  // Walls are ground too. Paint a rectangle of one and it works out its own
+  // corners, crenellations and foundation course; paint a rectangle one tile
+  // high and the same nine tiles give you a fence with two finished ends.
+  // `hollow` walls are drawn as a frame with a see-through middle and rounded
+  // corners, so the ground the wall stands on has to be laid under them first,
+  // or the base grass shows through and the wall gets a green halo.
+  rampart:  { id: 5, sheet: 'medieval', block: [0, 8], solid: true, hollow: true },
+  keepwall: { id: 6, sheet: 'medieval', block: [5, 8], solid: true, hollow: true },
+  palisade: { id: 7, sheet: 'medieval', block: [10, 8], solid: true, hollow: true },
+  // the plank crossing. Its nine tiles carry their own rails and their own
+  // finished ends, which is why the bridge is ground and not two rows of posts.
+  bridge:   { id: 8, sheet: 'nature', block: [16, 3] },
 };
-const GROUND_BY_ID = [];
-for (const name in GROUND) { GROUND[name].name = name; GROUND_BY_ID[GROUND[name].id] = GROUND[name]; }
-const GRASS = GROUND.grass.id;
-// when a grass tile touches several kinds of ground, the heavier one wins the edge
-const EDGE_PRIORITY = [GROUND.water, GROUND.stone, GROUND.sand, GROUND.dirt];
+const BY_ID = [];
+for (const name in GROUND) { GROUND[name].name = name; BY_ID[GROUND[name].id] = GROUND[name]; }
+const GRASS = GROUND.grass.id, WATER = GROUND.water.id;
 
-// Indoor tile codes.
+/* Roads are not a kind of ground. They are a thin layer drawn over whatever the
+ * ground is, because a lane has to be able to cross the market square without
+ * cutting the paving in two - which is exactly what happens if the road owns the
+ * tile. Each road tile picks its piece from the sides the road continues towards,
+ * so corners, tees and crossroads come out right on their own.
+ * The kit sits at [0,3] of the medieval sheet; these offsets were read off it. */
+const ROAD_KIT = [0, 3];
+const ROAD_PIECE = {
+  ES: [0, 0], EW: [1, 0], SW: [2, 0],
+  NE: [0, 1], NS: [1, 1], NW: [2, 1],
+  NES: [0, 2], NESW: [1, 2], NSW: [2, 2],
+  ESW: [0, 3], NEW: [1, 3],
+  N: [1, 1], S: [1, 1], E: [1, 0], W: [1, 0], '': [2, 3],
+};
+
+/* Fences work the same way, and for the same reason: a fence has to be able to
+ * run along the edge of a field without owning the ground under it. Unlike a
+ * road a fence is SOLID, except where the map lists a gateway. */
+const FENCE_KIT = [19, 2], FENCE_SHEET = 'nature';
+const FENCE_PIECE = {
+  ES: [0, 0], SW: [1, 0], E: [2, 0], NS: [3, 0], NES: [4, 0], ESW: [5, 0], '': [6, 0],
+  NE: [0, 1], NW: [1, 1], W: [2, 1], EW: [3, 1], NEW: [4, 1], NSW: [5, 1], NESW: [6, 1],
+  N: [3, 0], S: [3, 0],
+};
+// indoor tile codes
 const VOID = 0, FLOOR = 1, WALL = 2;
-const FLOORS = {
-  // `checker` alternates two tiles by (x+y), which reads as a floor that was laid
-  // on purpose; `cells` picks at random, which suits floorboards.
-  marble: { sheet: 'floor_tile', checker: [[0, 0], [0, 2]] },
-  wood: { sheet: 'floor_wood', cells: [[1, 0], [1, 1]] },
-};
-const WALLS = {
-  stone: { sheet: 'wall_stone', col: 0, row: 0 },
-  brick: { sheet: 'wall_brick', col: 0, row: 0 },
-};
-// small plants scattered over open grass so big fields are not flat
-const SCATTER = [];
-for (let x = 0; x <= 10; x++) for (let y = 3; y <= 4; y++) SCATTER.push([x, y]);
+
+const WALLSETS = { stone: [0, 8], keep: [5, 8], wood: [10, 8] };
 
 // ---------------------------------------------------------------- helpers
 function seededRandom(seed) {
@@ -80,168 +106,262 @@ const game = {
   time: 0, fade: 0, pending: null, portalLock: true, banner: '', bannerTimer: 0,
 };
 
-function makeEntity(sheetName, name, tx, ty, dir, extra) {
+// a character is exactly one tile: the sheet is 4 columns (the way they face)
+// by several rows (the steps of the walk)
+const DIR_COLUMN = [1, 2, 0, 3];   // engine dir 0 up, 1 left, 2 down, 3 right
+function makeEntity(sheet, name, tx, ty, dir, extra) {
   return Object.assign({
-    id: sheetName, name, sheet: game.images[sheetName],
-    x: tx * T - 16, y: ty * T - 32, dir: dir || 0,
-    frame: 0, anim: 0, moving: false, speed: 110, npc: true,
+    id: sheet, name, sheet,
+    x: tx * T, y: ty * T, dir: dir || 0,
+    frame: 0, anim: 0, moving: false, speed: 46, npc: true,
   }, extra || {});
 }
-function feet(e) { return { x: e.x + 20, y: e.y + 46, w: 24, h: 16 }; }
+function feet(e) { return { x: e.x + 3, y: e.y + 10, w: 10, h: 6 }; }
 
 // ---------------------------------------------------------------- building maps
 function makeTiles(def) {
-  const tiles = [];
+  const tiles = [], roads = [], fences = [], open = new Set();
   const empty = def.kind === 'outdoor' ? GROUND[def.base || 'grass'].id : VOID;
-  for (let y = 0; y < def.h; y++) tiles.push(new Array(def.w).fill(empty));
-  const fill = (x0, y0, x1, y1, v) => {
+  for (let y = 0; y < def.h; y++) {
+    tiles.push(new Array(def.w).fill(empty));
+    roads.push(new Array(def.w).fill(0));
+    fences.push(new Array(def.w).fill(0));
+  }
+  const inside = (x, y) => x >= 0 && y >= 0 && x < def.w && y < def.h;
+  const fill = (grid, x0, y0, x1, y1, v) => {
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++)
-      if (x >= 0 && y >= 0 && x < def.w && y < def.h) tiles[y][x] = v;
+      if (inside(x, y)) grid[y][x] = v;
   };
   if (def.kind === 'outdoor') {
     for (const [name, x0, y0, x1, y1] of (def.ground || [])) {
       const g = GROUND[name];
       if (!g) { console.warn('unknown ground:', name); continue; }
-      fill(x0, y0, x1, y1, g.id);
+      fill(tiles, x0, y0, x1, y1, g.id);
     }
+    // roads are painted after, onto their own layer, so they lie over the paving
+    for (const [x0, y0, x1, y1] of (def.roads || [])) fill(roads, x0, y0, x1, y1, 1);
+    for (const [x0, y0, x1, y1] of (def.fences || [])) fill(fences, x0, y0, x1, y1, 1);
+    // a gateway: the wall or fence keeps its tile, so the runs either side still
+    // draw as wall, but the player may walk through it
+    for (const [x, y, w, h] of (def.gaps || []))
+      for (let yy = y; yy < y + (h || 1); yy++)
+        for (let xx = x; xx < x + (w || 1); xx++) open.add(xx + ',' + yy);
   } else {
     const [rx, ry, rw, rh] = def.room;
-    fill(rx - 1, ry - 3, rx + rw, ry + rh, WALL);    // the box of walls
-    fill(rx, ry, rx + rw - 1, ry + rh - 1, FLOOR);   // the floor of the room
-    for (const [x, y, w, h] of (def.extraFloor || [])) fill(x, y, x + w - 1, y + h - 1, FLOOR);
-  }
-  return tiles;
-}
-
-function tileAt(tiles, x, y) {
-  if (x < 0 || y < 0 || y >= tiles.length || x >= tiles[0].length) return GRASS;
-  return tiles[y][x];
-}
-// Which quarter-tile of the grass sheet blends this corner towards its neighbours.
-function grassCorner(tiles, x, y, q) {
-  const dx = (q % 2 === 0) ? -1 : 1, dy = (q < 2) ? -1 : 1;
-  const h = tileAt(tiles, x + dx, y), v = tileAt(tiles, x, y + dy), d = tileAt(tiles, x + dx, y + dy);
-  if (h === GRASS && v === GRASS && d === GRASS) return null;
-  let ground = null;
-  for (const g of EDGE_PRIORITY) {
-    if (h === g.id || v === g.id || d === g.id) { ground = g; break; }
-  }
-  if (!ground) return null;
-  const [[ox, oy], [ix, iy]] = ground.edge;
-  if (h === GRASS && v === GRASS) return [ix + (q % 2 === 0 ? 1 : 0), iy + (q < 2 ? 1 : 0)];
-  if (h !== GRASS && v !== GRASS) return [ox + (q % 2 === 0 ? 0 : 2), oy + (q < 2 ? 0 : 2)];
-  if (h !== GRASS) return [ox + (q % 2 === 0 ? 0 : 2), oy + 1];
-  return [ox + 1, oy + (q < 2 ? 0 : 2)];
-}
-// Cap, middle or base of a wall, decided by what sits above and below it.
-function wallRow(tiles, x, y) {
-  const below = tileAt(tiles, x, y + 1), above = (y - 1 < 0) ? VOID : tiles[y - 1][x];
-  if (below === FLOOR) return 2;
-  if (above !== WALL) return 0;
-  return 1;
-}
-
-function drawGround(ctx, def, tiles) {
-  const rnd = seededRandom(7);
-  const terrain = game.images.terrain;
-  for (let y = 0; y < def.h; y++) for (let x = 0; x < def.w; x++) {
-    const ground = GROUND_BY_ID[tiles[y][x]];
-    const cell = ground.plain[Math.floor(rnd() * ground.plain.length)];
-    const img = ground.sheet ? game.images[ground.sheet] : terrain;
-    ctx.drawImage(img, cell[0] * T, cell[1] * T, T, T, x * T, y * T, T, T);
-    if (ground.id === GRASS) {
-      for (let q = 0; q < 4; q++) {
-        const c = grassCorner(tiles, x, y, q);
-        if (c) ctx.drawImage(terrain, c[0] * T + (q % 2) * 16, c[1] * T + (q >> 1) * 16, 16, 16,
-          x * T + (q % 2) * 16, y * T + (q >> 1) * 16, 16, 16);
+    fill(tiles, rx - 1, ry - 1, rx + rw, ry + rh, WALL);
+    fill(tiles, rx, ry, rx + rw - 1, ry + rh - 1, FLOOR);
+    // a corridor cut through the wall needs jambs, or it ends in raw black
+    for (const [x, y, w, h] of (def.extraFloor || [])) {
+      fill(tiles, x, y, x + w - 1, y + h - 1, FLOOR);
+      for (let yy = y; yy < y + h; yy++) {
+        if (at(tiles, x - 1, yy, WALL) === VOID) tiles[yy][x - 1] = WALL;
+        if (at(tiles, x + w, yy, WALL) === VOID) tiles[yy][x + w] = WALL;
       }
+      for (let xx = x - 1; xx <= x + w; xx++)
+        if (inside(xx, y + h) && tiles[y + h][xx] === VOID) tiles[y + h][xx] = WALL;
     }
   }
-  // scattered flowers and grass tufts, only where the grass is clear of edges
-  const rnd2 = seededRandom(19);
-  const density = def.scatter == null ? 0.07 : def.scatter;
-  for (let y = 0; y < def.h; y++) for (let x = 0; x < def.w; x++) {
-    if (tiles[y][x] !== GRASS || rnd2() > density) continue;
-    let clear = true;
-    for (let dy = -1; dy <= 1 && clear; dy++) for (let dx = -1; dx <= 1; dx++)
-      if (tileAt(tiles, x + dx, y + dy) !== GRASS) { clear = false; break; }
-    if (!clear) continue;
-    const c = SCATTER[Math.floor(rnd2() * SCATTER.length)];
-    ctx.drawImage(game.images.flowers, c[0] * T, c[1] * T, T, T, x * T, y * T, T, T);
-  }
+  return { tiles, roads, fences, open };
 }
 
-function drawRoom(ctx, def, tiles, w, h) {
-  const floor = FLOORS[def.floor], wall = WALLS[def.wall];
-  const floorImg = game.images[floor.sheet], wallImg = game.images[wall.sheet];
-  const rnd = seededRandom(7);
-  ctx.fillStyle = '#0b0a0e';
+function at(tiles, x, y, outside) {
+  if (x < 0 || y < 0 || y >= tiles.length || x >= tiles[0].length) return outside;
+  return tiles[y][x];
+}
+// which of the nine tiles of an outlined block this one is, from its neighbours
+function ninePiece(tiles, x, y, v, outside) {
+  const n = at(tiles, x, y - 1, outside) === v, s = at(tiles, x, y + 1, outside) === v;
+  const w = at(tiles, x - 1, y, outside) === v, e = at(tiles, x + 1, y, outside) === v;
+  return [w ? (e ? 1 : 2) : 0, n ? (s ? 1 : 2) : 0];
+}
+function roadPiece(roads, x, y) {
+  let m = '';
+  if (at(roads, x, y - 1, 1)) m += 'N';
+  if (at(roads, x + 1, y, 1)) m += 'E';
+  if (at(roads, x, y + 1, 1)) m += 'S';
+  if (at(roads, x - 1, y, 1)) m += 'W';
+  return ROAD_PIECE[m] || ROAD_PIECE.NESW;
+}
+
+function fencePiece(fences, x, y) {
+  let m = '';
+  if (at(fences, x, y - 1, 0)) m += 'N';
+  if (at(fences, x + 1, y, 0)) m += 'E';
+  if (at(fences, x, y + 1, 0)) m += 'S';
+  if (at(fences, x - 1, y, 0)) m += 'W';
+  return FENCE_PIECE[m] || FENCE_PIECE.NESW;
+}
+
+function drawOutdoor(ctx, def, tiles, roads, fences) {
+  const med = game.images.medieval;
+  const grass = GROUND.grass, rnd = seededRandom(9);
+  // the grass goes down everywhere first, so every other kind of ground sits on it
+  for (let y = 0; y < def.h; y++) for (let x = 0; x < def.w; x++)
+    drawGroundCell(ctx, grass, [1, 1], x, y, rnd);
+  for (let y = 0; y < def.h; y++) for (let x = 0; x < def.w; x++) {
+    const v = tiles[y][x];
+    if (v === GRASS) continue;
+    const g = BY_ID[v], p = ninePiece(tiles, x, y, v, v);
+    // only the middle piece is a full square; every edge and corner needs the
+    // ground it sits on laid under it, and a wall needs it everywhere
+    if (g.hollow || p[0] !== 1 || p[1] !== 1)
+      drawGroundCell(ctx, BY_ID[groundAround(tiles, x, y, v)], [1, 1], x, y, null);
+    drawGroundCell(ctx, g, p, x, y, rnd);
+  }
+  for (let y = 0; y < def.h; y++) for (let x = 0; x < def.w; x++) {
+    if (!roads[y][x]) continue;
+    const p = roadPiece(roads, x, y);
+    ctx.drawImage(med, (ROAD_KIT[0] + p[0]) * T, (ROAD_KIT[1] + p[1]) * T,
+                  T, T, x * T, y * T, T, T);
+  }
+  const nat = game.images[FENCE_SHEET];
+  for (let y = 0; y < def.h; y++) for (let x = 0; x < def.w; x++) {
+    if (!fences[y][x]) continue;
+    const p = fencePiece(fences, x, y);
+    ctx.drawImage(nat, (FENCE_KIT[0] + p[0]) * T, (FENCE_KIT[1] + p[1]) * T,
+                  T, T, x * T, y * T, T, T);
+  }
+}
+/* What this tile is standing ON: whichever of its neighbours is commonest, not
+ * counting itself or any wall. Every block in the tileset has rounded corners
+ * and the walls are see-through in the middle, so SOMETHING has to be laid down
+ * first or the base grass shows through - which is how a yard of bare earth
+ * inside a stone castle ends up with green corners.
+ * Ties go to the ground that is not the map's base, because a patch of paving in
+ * a field is far more often bordered by the field than the other way round. */
+function groundAround(tiles, x, y, self) {
+  const count = new Map();
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    if (!dx && !dy) continue;
+    const v = at(tiles, x + dx, y + dy, GRASS);
+    if (v === self || BY_ID[v].hollow) continue;
+    count.set(v, (count.get(v) || 0) + 1);
+  }
+  let best = GRASS, n = 0;
+  for (const [v, c] of count)
+    if (c > n || (c === n && best === GRASS && v !== GRASS)) { best = v; n = c; }
+  return best;
+}
+// one tile of ground: the piece the neighbours ask for, or now and then one of
+// the ground's stand-ins, but only where the piece is the middle - swapping an
+// edge tile would break the outline the block draws round itself. A stand-in may
+// be a decal with holes in it (a rock lying on the earth), so the plain middle
+// goes down underneath it first.
+function drawGroundCell(ctx, g, p, x, y, rnd) {
+  const im = game.images[g.sheet];
+  const mid = [g.block[0] + p[0], g.block[1] + p[1]];
+  ctx.drawImage(im, mid[0] * T, mid[1] * T, T, T, x * T, y * T, T, T);
+  if (!rnd) return;
+  if (!g.alt || p[0] !== 1 || p[1] !== 1) { rnd(); return; }
+  const r = rnd();
+  if (r >= g.altRate) return;
+  const a = g.alt[Math.floor(r / g.altRate * g.alt.length) % g.alt.length];
+  ctx.drawImage(im, a[0] * T, a[1] * T, T, T, x * T, y * T, T, T);
+}
+
+function drawIndoor(ctx, def, tiles, w, h) {
+  const med = game.images.medieval;
+  const floor = GROUND[def.floor] || GROUND.wood;
+  const wall = WALLSETS[def.wall] || WALLSETS.stone;
+  const rnd = seededRandom(5);
+  ctx.fillStyle = '#14121a';
   ctx.fillRect(0, 0, w, h);
   for (let y = 0; y < def.h; y++) for (let x = 0; x < def.w; x++) {
     const v = tiles[y][x];
     if (v === FLOOR) {
-      const cell = floor.checker ? floor.checker[(x + y) & 1]
-        : floor.cells[Math.floor(rnd() * floor.cells.length)];
-      ctx.drawImage(floorImg, cell[0] * T, cell[1] * T, T, T, x * T, y * T, T, T);
+      drawGroundCell(ctx, floor, ninePiece(tiles, x, y, FLOOR, FLOOR), x, y, rnd);
     } else if (v === WALL) {
-      ctx.drawImage(wallImg, (wall.col + (x % 3)) * T, (wall.row + wallRow(tiles, x, y)) * T,
-        T, T, x * T, y * T, T, T);
+      const p = ninePiece(tiles, x, y, WALL, VOID);
+      ctx.drawImage(med, (wall[0] + p[0]) * T, (wall[1] + p[1]) * T, T, T, x * T, y * T, T, T);
     }
   }
+  // patches: a carpet, a dais, a different floor in one corner. Same nine-slice
+  // rule as outdoors, so a patch draws its own edge and does not need a border
+  // laid by hand.
+  for (const [name, x0, y0, x1, y1] of (def.patches || [])) {
+    const g = GROUND[name];
+    if (!g) { console.warn('unknown patch ground:', name); continue; }
+    const inside = (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (x < 0 || y < 0 || x >= def.w || y >= def.h || tiles[y][x] !== FLOOR) continue;
+      const p = [inside(x - 1, y) ? (inside(x + 1, y) ? 1 : 2) : 0,
+                 inside(x, y - 1) ? (inside(x, y + 1) ? 1 : 2) : 0];
+      drawGroundCell(ctx, g, p, x, y, rnd);
+    }
+  }
+}
+
+function placeObject(map, type, tx, ty) {
+  const d = OBJECTS[type];
+  if (!d) { console.warn('unknown object:', type); return null; }
+  const o = {
+    type, def: d, x: tx * T, y: ty * T, w: d.w * T, h: d.h * T,
+    solid: d.solid !== false, cols: [],
+  };
+  const boxes = d.cols || (d.col ? [d.col] : []);
+  for (const b of boxes) o.cols.push({ x: o.x + b[0], y: o.y + b[1], w: b[2], h: b[3] });
+  if (d.door) o.door = { x: o.x + d.door[0], y: o.y + d.door[1], w: d.door[2], h: d.door[3] };
+  // the part actually painted, used for sorting and for culling
+  const art = d.art || [0, 0, o.w, o.h];
+  o.artBottom = o.y + art[1] + art[3];
+  map.objects.push(o);
+  return o;
 }
 
 function buildMap(name) {
   const def = WORLD.maps[name];
   if (!def) throw new Error('No such map: ' + name);
-  const tiles = makeTiles(def);
+  const { tiles, roads, fences, open } = makeTiles(def);
   const canvas = document.createElement('canvas');
   canvas.width = def.w * T; canvas.height = def.h * T;
   const ctx = canvas.getContext('2d');
-  if (def.kind === 'outdoor') drawGround(ctx, def, tiles);
-  else drawRoom(ctx, def, tiles, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = false;
+  if (def.kind === 'outdoor') drawOutdoor(ctx, def, tiles, roads, fences);
+  else drawIndoor(ctx, def, tiles, canvas.width, canvas.height);
 
-  const map = { name, def, tiles, canvas, objects: [], npcs: [], portals: [] };
-  for (const [type, tx, ty] of (def.objects || [])) {
-    const d = OBJECTS[type];
-    if (!d) { console.warn('unknown object:', type); continue; }
-    const o = {
-      type, x: tx * T, y: ty * T, w: d.w, h: d.h,
-      img: game.images['obj:' + type], flat: !!d.flat, anim: d.anim || null, cols: [],
-    };
-    const boxes = d.cols || (d.col ? [d.col] : []);
-    for (const b of boxes) o.cols.push({ x: o.x + b[0], y: o.y + b[1], w: b[2], h: b[3] });
-    if (d.door) o.door = { x: o.x + d.door[0], y: o.y + d.door[1], w: d.door[2], h: d.door[3] };
-    if (d.walkable) o.walkable = { x: o.x + d.walkable[0], y: o.y + d.walkable[1], w: d.walkable[2], h: d.walkable[3] };
-    map.objects.push(o);
-  }
-  // groves: many of the same kind of object sprinkled over a rectangle, so a
-  // forest or an orchard is one line of data instead of a hundred
+  const map = { name, def, tiles, roads, fences, open, canvas, objects: [], npcs: [], portals: [] };
+  for (const [type, tx, ty] of (def.objects || [])) placeObject(map, type, tx, ty);
+
+  // groves: many of the same thing sprinkled over a rectangle, so a wood is one
+  // line of data, and a paved square gets its cracks and litter the same way.
+  // A piece is dropped if it would stand on anything but the ground the grove
+  // names, within a tile of a road, or close enough to another object that the
+  // two drawings would visibly sit on top of one another - a wood should look
+  // grown, not stacked.
+  const artBox = o => ({ x: o.x + o.def.art[0], y: o.y + o.def.art[1],
+                         w: o.def.art[2], h: o.def.art[3] });
   for (const g of (def.groves || [])) {
     const rnd = seededRandom(g.seed || 1);
     const [gx, gy, gw, gh] = g.rect;
+    const on = GROUND[g.on || 'grass'].id;
     for (let i = 0; i < g.count; i++) {
       const type = g.types[Math.floor(rnd() * g.types.length)];
       const d = OBJECTS[type];
       if (!d) continue;
       const tx = gx + Math.floor(rnd() * gw), ty = gy + Math.floor(rnd() * gh);
-      const o = {
-        type, x: tx * T, y: ty * T, w: d.w, h: d.h,
-        img: game.images['obj:' + type], flat: !!d.flat, anim: d.anim || null, cols: [],
-      };
-      // skip anything that would land on a road, in water or on top of a building
       let bad = false;
-      for (let yy = 0; yy < Math.ceil(d.h / T) && !bad; yy++)
-        for (let xx = 0; xx < Math.ceil(d.w / T); xx++) {
-          const t = tileAt(tiles, tx + xx, ty + yy);
-          if (t !== GRASS) { bad = true; break; }
+      for (let yy = -1; yy <= d.h && !bad; yy++)
+        for (let xx = -1; xx <= d.w; xx++) {
+          const right = at(tiles, tx + xx, ty + yy, on) === on;
+          const nearRoad = at(roads, tx + xx, ty + yy, 0) || at(fences, tx + xx, ty + yy, 0);
+          // the ring of tiles around it only has to be free of road; the tiles
+          // it actually covers have to be the right ground as well
+          const covered = xx >= 0 && yy >= 0 && xx < d.w && yy < d.h;
+          if (nearRoad || (covered && !right)) { bad = true; break; }
         }
       if (bad) continue;
-      const boxes = d.cols || (d.col ? [d.col] : []);
-      for (const b of boxes) o.cols.push({ x: o.x + b[0], y: o.y + b[1], w: b[2], h: b[3] });
-      if (map.objects.some(p => p.cols.length && o.cols.length && overlaps(p.cols[0], o.cols[0]))) continue;
-      map.objects.push(o);
+      const o = placeObject(map, type, tx, ty);
+      if (!o) continue;
+      const a = artBox(o), room = { x: a.x + 2, y: a.y + a.h * 0.45, w: a.w - 4, h: a.h * 0.55 };
+      const clash = map.objects.some(q => {
+        if (q === o) return false;
+        const b = artBox(q);
+        return overlaps(room, { x: b.x + 2, y: b.y + b.h * 0.45, w: b.w - 4, h: b.h * 0.55 });
+      });
+      if (clash) map.objects.pop();
     }
   }
+
   for (const n of (def.npcs || [])) {
     const e = makeEntity(n.sheet, n.name, n.x, n.y, n.dir, { id: n.id, wander: n.wander || null });
     e.homeX = e.x;
@@ -260,7 +380,7 @@ function enterMap(name, spawn, dir) {
   const map = game.maps[name] || (game.maps[name] = buildMap(name));
   game.map = map;
   const p = game.player;
-  p.x = spawn[0] * T - 16; p.y = spawn[1] * T - 32;
+  p.x = spawn[0] * T; p.y = spawn[1] * T;
   if (dir != null) p.dir = dir;
   p.moving = false; p.frame = 0; p.anim = 0;
   game.entities = [p].concat(map.npcs);
@@ -284,10 +404,7 @@ function currentLine() {
   const d = game.dialog; if (!d) return null;
   return d.extra || d.lines[d.index];
 }
-function step(d) {
-  d.index++;
-  if (d.index >= d.lines.length) game.dialog = null;
-}
+function step(d) { d.index++; if (d.index >= d.lines.length) game.dialog = null; }
 function advanceDialog(choiceIndex) {
   const d = game.dialog; if (!d) return;
   const line = currentLine();
@@ -307,14 +424,13 @@ function advanceDialog(choiceIndex) {
 function groundBlocks(px, py) {
   const map = game.map, def = map.def;
   if (px < 0 || py < 0 || px >= def.w * T || py >= def.h * T) return 'edge';
-  const v = map.tiles[Math.floor(py / T)][Math.floor(px / T)];
+  const tx = Math.floor(px / T), ty = Math.floor(py / T);
+  const v = map.tiles[ty][tx];
   if (def.kind !== 'outdoor') return v === FLOOR ? null : 'wall';
-  if (!GROUND_BY_ID[v].solid) return null;
-  for (const o of map.objects) {
-    if (o.walkable && px >= o.walkable.x && px < o.walkable.x + o.walkable.w &&
-        py >= o.walkable.y && py < o.walkable.y + o.walkable.h) return null;
-  }
-  return 'water';
+  const shut = !map.open.has(tx + ',' + ty);
+  if (map.fences[ty][tx] && shut) return 'wall';
+  if (!BY_ID[v].solid) return null;
+  return shut ? (v === WATER ? 'water' : 'wall') : null;
 }
 function blockedAt(box, self) {
   for (const o of game.map.objects) for (const c of o.cols) if (overlaps(box, c)) return o;
@@ -343,7 +459,7 @@ function inputVector() {
 function nearestNpc() {
   const pf = feet(game.player);
   const cx = pf.x + pf.w / 2, cy = pf.y + pf.h / 2;
-  let best = null, bd = 46;
+  let best = null, bd = 22;
   for (const e of game.entities) if (e.npc) {
     const f = feet(e);
     const d = Math.hypot(f.x + f.w / 2 - cx, f.y + f.h / 2 - cy);
@@ -362,8 +478,13 @@ function doAction() {
   if (npc) { openDialog(npc); return; }
   const p = portalUnderPlayer();
   if (p && !game.pending) { game.pending = p; return; }
-  for (const o of game.map.objects) if (o.door && overlaps(feet(game.player), o.door)) {
-    showHint('The door is locked.'); return;
+  // a door is drawn at the foot of a building, so the player's feet can never be
+  // on it - he is standing in front of it. Look a short step ahead instead.
+  const f = feet(game.player), d = game.player.dir;
+  const reach = { x: f.x + (d === 1 ? -6 : d === 3 ? 6 : 0), y: f.y + (d === 0 ? -8 : d === 2 ? 6 : 0),
+                  w: f.w, h: f.h };
+  for (const o of game.map.objects) if (o.door && overlaps(reach, o.door)) {
+    showHint('The door is barred.'); return;
   }
   showHint('Nothing here.');
 }
@@ -374,7 +495,6 @@ function update(dt) {
   if (game.hintTimer > 0) game.hintTimer -= dt;
   if (game.bannerTimer > 0) game.bannerTimer -= dt;
 
-  // moving between maps, with a short fade
   if (game.pending) {
     game.fade += dt * 4;
     if (game.fade >= 1) {
@@ -393,23 +513,22 @@ function update(dt) {
   p.moving = !!(v.x || v.y);
   if (p.moving) {
     if (Math.abs(v.x) > Math.abs(v.y)) p.dir = v.x > 0 ? 3 : 1; else p.dir = v.y > 0 ? 2 : 0;
-    const stepPx = p.speed * dt;
-    moveEntity(p, Math.round(v.x * stepPx * 10) / 10, Math.round(v.y * stepPx * 10) / 10);
-    p.anim += dt * 12; p.frame = 1 + Math.floor(p.anim) % 8;
+    const s = p.speed * dt;
+    moveEntity(p, Math.round(v.x * s * 10) / 10, Math.round(v.y * s * 10) / 10);
+    p.anim += dt * 7; p.frame = Math.floor(p.anim) % 4;
   } else { p.frame = 0; p.anim = 0; }
 
   for (const e of game.map.npcs) {
     if (!e.wander) continue;
-    const target = e.homeX + Math.sin(game.time * 0.5 + (e.homeX % 7)) * e.wander.range;
+    const target = e.homeX + Math.sin(game.time * 0.4 + (e.homeX % 7)) * e.wander.range;
     const d = target - e.x;
-    if (Math.abs(d) > 0.6) {
+    if (Math.abs(d) > 0.4) {
       e.dir = d > 0 ? 3 : 1;
       moveEntity(e, Math.sign(d) * Math.min(Math.abs(d), e.wander.speed * dt), 0);
-      e.anim += dt * 10; e.frame = 1 + Math.floor(e.anim) % 8;
+      e.anim += dt * 6; e.frame = Math.floor(e.anim) % 4;
     } else e.frame = 0;
   }
 
-  // doorways fire when you step on them, but not the instant you arrive on one
   const portal = portalUnderPlayer();
   if (game.portalLock) { if (!portal) game.portalLock = false; }
   else if (portal) game.pending = portal;
@@ -418,13 +537,15 @@ function update(dt) {
 // ---------------------------------------------------------------- rendering
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-let scale = 2, vw = 480, vh = 320;
+let scale = 3, vw = 320, vh = 240;
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   const cw = Math.floor(window.innerWidth * dpr), ch = Math.floor(window.innerHeight * dpr);
   canvas.width = cw; canvas.height = ch;
   canvas.style.width = window.innerWidth + 'px'; canvas.style.height = window.innerHeight + 'px';
-  scale = Math.max(1, Math.round(Math.min(cw, ch) / 340));
+  // a whole number of screen pixels per art pixel, never fewer than three, so the
+  // pixels stay square and visibly pixels
+  scale = Math.max(3, Math.min(8, Math.round(Math.min(cw, ch) / 230)));
   vw = Math.ceil(cw / scale); vh = Math.ceil(ch / scale);
 }
 window.addEventListener('resize', resize); resize();
@@ -433,33 +554,33 @@ function camera() {
   const def = game.map.def, p = game.player;
   const mw = def.w * T, mh = def.h * T;
   const cx = mw <= vw ? Math.round((mw - vw) / 2)
-    : Math.max(0, Math.min(mw - vw, Math.round(p.x + 32 - vw / 2)));
+    : Math.max(0, Math.min(mw - vw, Math.round(p.x + T / 2 - vw / 2)));
   const cy = mh <= vh ? Math.round((mh - vh) / 2)
-    : Math.max(0, Math.min(mh - vh, Math.round(p.y + 48 - vh / 2)));
+    : Math.max(0, Math.min(mh - vh, Math.round(p.y + T / 2 - vh / 2)));
   return { x: cx, y: cy };
 }
 function drawEntity(e, cam) {
-  ctx.drawImage(e.sheet, e.frame * 64, e.dir * 64, 64, 64,
-    Math.round(e.x - cam.x), Math.round(e.y - cam.y), 64, 64);
+  const sheet = game.images['ch:' + e.sheet];
+  if (!sheet) return;
+  ctx.drawImage(sheet, DIR_COLUMN[e.dir] * T, e.frame * T, T, T,
+    Math.round(e.x - cam.x), Math.round(e.y - cam.y), T, T);
 }
 function drawObject(o, cam) {
-  const x = Math.round(o.x - cam.x), y = Math.round(o.y - cam.y);
-  if (o.anim) {
-    const f = Math.floor(game.time * o.anim.fps) % o.anim.frames;
-    ctx.drawImage(o.img, f * o.anim.w, 0, o.anim.w, o.anim.h, x, y, o.anim.w, o.anim.h);
-  } else ctx.drawImage(o.img, x, y);
+  const d = o.def;
+  ctx.drawImage(game.images[d.sheet], d.sx * T, d.sy * T, d.w * T, d.h * T,
+    Math.round(o.x - cam.x), Math.round(o.y - cam.y), o.w, o.h);
 }
 
 function nineSlice(img, x, y, w, h, b) {
   const iw = img.width, ih = img.height;
-  const pieces = [
+  const p = [
     [0, 0, b, b, x, y, b, b], [b, 0, iw - 2 * b, b, x + b, y, w - 2 * b, b], [iw - b, 0, b, b, x + w - b, y, b, b],
     [0, b, b, ih - 2 * b, x, y + b, b, h - 2 * b], [b, b, iw - 2 * b, ih - 2 * b, x + b, y + b, w - 2 * b, h - 2 * b],
     [iw - b, b, b, ih - 2 * b, x + w - b, y + b, b, h - 2 * b],
     [0, ih - b, b, b, x, y + h - b, b, b], [b, ih - b, iw - 2 * b, b, x + b, y + h - b, w - 2 * b, b],
     [iw - b, ih - b, b, b, x + w - b, y + h - b, b, b],
   ];
-  for (const p of pieces) ctx.drawImage(img, ...p);
+  for (const q of p) ctx.drawImage(img, ...q);
 }
 function wrapText(text, maxW) {
   const words = text.split(' '); const lines = []; let cur = '';
@@ -474,105 +595,103 @@ function wrapText(text, maxW) {
 const ui = { choices: [], actionBtn: null, debugBtn: null, mapBtn: null };
 function drawDialog() {
   const line = currentLine(); if (!line) return;
-  const margin = 8, h = 84, w = Math.min(vw - 2 * margin, 460);
+  const margin = 6, h = 62, w = Math.min(vw - 2 * margin, 300);
   const x = Math.round((vw - w) / 2), y = vh - h - margin;
-  nineSlice(game.images.bubble, x, y, w, h, 10);
+  nineSlice(game.images.bubble, x, y, w, h, 12);
   const speaker = line.who === game.player.name ? game.player : game.dialog.npc;
-  ctx.drawImage(game.images.facebox, x + 8, y + 10, 48, 48);
-  ctx.drawImage(speaker.sheet, 16, 2 * 64 + 4, 32, 32, x + 12, y + 14, 40, 40);
-  ctx.fillStyle = '#3a2418'; ctx.font = 'bold 11px sans-serif'; ctx.textBaseline = 'top';
-  ctx.fillText(line.who, x + 64, y + 10);
-  ctx.font = '11px sans-serif';
-  wrapText(line.text, w - 76).slice(0, 4).forEach((l, i) => ctx.fillText(l, x + 64, y + 24 + i * 13));
+  const face = game.images['face:' + speaker.sheet];
+  ctx.drawImage(game.images.facebox, x + 5, y + 7, 48, 48);
+  if (face) ctx.drawImage(face, x + 10, y + 12, 38, 38);
+  ctx.fillStyle = '#3a2418'; ctx.font = 'bold 8px sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillText(line.who, x + 58, y + 8);
+  ctx.font = '8px sans-serif';
+  wrapText(line.text, w - 66).slice(0, 5).forEach((l, i) => ctx.fillText(l, x + 58, y + 19 + i * 9));
   ui.choices = [];
   if (line.choices) {
-    const ch = 18, cy0 = y - line.choices.length * ch - 6;
+    const ch = 12, cy0 = y - line.choices.length * ch - 4;
     line.choices.forEach((c, i) => {
-      const cx = x + 30, cw = w - 60, cy = cy0 + i * ch;
-      ctx.fillStyle = i === game.dialog.choice ? 'rgba(240,200,110,0.95)' : 'rgba(250,240,225,0.9)';
+      const cx = x + 20, cw = w - 40, cy = cy0 + i * ch;
+      ctx.fillStyle = i === game.dialog.choice ? 'rgba(244,200,110,0.96)' : 'rgba(250,240,225,0.92)';
       ctx.fillRect(cx, cy, cw, ch - 2);
-      ctx.strokeStyle = '#7a4a2a'; ctx.strokeRect(cx + 0.5, cy + 0.5, cw - 1, ch - 3);
-      ctx.fillStyle = '#3a2418'; ctx.font = '11px sans-serif';
-      ctx.fillText((i === game.dialog.choice ? '> ' : '   ') + c.text, cx + 6, cy + 3);
+      ctx.strokeStyle = '#6a3f22'; ctx.strokeRect(cx + 0.5, cy + 0.5, cw - 1, ch - 3);
+      ctx.fillStyle = '#3a2418'; ctx.font = '8px sans-serif';
+      ctx.fillText((i === game.dialog.choice ? '> ' : '  ') + c.text, cx + 4, cy + 2);
       ui.choices.push({ x: cx, y: cy, w: cw, h: ch, i });
     });
   } else {
-    ctx.fillStyle = '#7a4a2a'; ctx.font = '10px sans-serif';
-    ctx.fillText('▼', x + w - 18, y + h - 16);
+    ctx.drawImage(game.images.arrow, x + w - 20, y + h - 18);
   }
 }
 function drawHud() {
   const s = game.stats;
-  ctx.fillStyle = 'rgba(20,16,24,0.7)'; ctx.fillRect(6, 6, 186, 20);
-  ctx.fillStyle = '#f0e6d0'; ctx.font = 'bold 10px sans-serif'; ctx.textBaseline = 'top';
-  ctx.fillText(`Treasury ${s.treasury}   Order ${s.order}   Food ${s.food}`, 12, 11);
+  ctx.fillStyle = 'rgba(20,16,24,0.72)'; ctx.fillRect(4, 4, 150, 14);
+  ctx.fillStyle = '#f2e8d2'; ctx.font = 'bold 8px sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillText(`Treasury ${s.treasury}   Order ${s.order}   Food ${s.food}`, 9, 8);
   if (game.bannerTimer > 0 && !game.dialog) {
-    ctx.font = 'bold 13px sans-serif';
+    ctx.font = 'bold 10px sans-serif';
     const tw = ctx.measureText(game.banner).width;
     ctx.globalAlpha = Math.min(1, game.bannerTimer);
-    ctx.fillStyle = 'rgba(20,16,24,0.7)'; ctx.fillRect((vw - tw) / 2 - 10, 34, tw + 20, 22);
-    ctx.fillStyle = '#f0e6d0'; ctx.fillText(game.banner, (vw - tw) / 2, 39);
+    ctx.fillStyle = 'rgba(20,16,24,0.72)'; ctx.fillRect((vw - tw) / 2 - 8, 24, tw + 16, 16);
+    ctx.fillStyle = '#f2e8d2'; ctx.fillText(game.banner, (vw - tw) / 2, 28);
     ctx.globalAlpha = 1;
   }
   if (game.hintTimer > 0 && !game.dialog) {
-    ctx.font = '11px sans-serif'; const tw = ctx.measureText(game.hint).width + 16;
-    ctx.fillStyle = 'rgba(20,16,24,0.75)'; ctx.fillRect((vw - tw) / 2, vh - 40, tw, 20);
-    ctx.fillStyle = '#f0e6d0'; ctx.fillText(game.hint, (vw - tw) / 2 + 8, vh - 35);
+    ctx.font = '8px sans-serif'; const tw = ctx.measureText(game.hint).width + 12;
+    ctx.fillStyle = 'rgba(20,16,24,0.78)'; ctx.fillRect((vw - tw) / 2, vh - 30, tw, 14);
+    ctx.fillStyle = '#f2e8d2'; ctx.fillText(game.hint, (vw - tw) / 2 + 6, vh - 26);
   }
   if (game.dialog) return;
   const cam = camera();
   const npc = nearestNpc();
   if (npc) {
-    ctx.font = '10px sans-serif'; ctx.fillStyle = '#fff';
-    ctx.fillText('Talk (E)', Math.round(npc.x - cam.x) + 10, Math.round(npc.y - cam.y) - 6);
+    ctx.font = '8px sans-serif'; ctx.fillStyle = '#fff';
+    ctx.fillText('E', Math.round(npc.x - cam.x) + 5, Math.round(npc.y - cam.y) - 9);
   } else {
     const portal = portalUnderPlayer();
     if (portal && !game.portalLock && portal.label) {
-      ctx.font = '11px sans-serif'; const tw = ctx.measureText(portal.label).width + 16;
-      ctx.fillStyle = 'rgba(20,16,24,0.75)'; ctx.fillRect((vw - tw) / 2, vh - 62, tw, 20);
-      ctx.fillStyle = '#f0e6d0'; ctx.fillText(portal.label, (vw - tw) / 2 + 8, vh - 57);
+      ctx.font = '8px sans-serif'; const tw = ctx.measureText(portal.label).width + 12;
+      ctx.fillStyle = 'rgba(20,16,24,0.78)'; ctx.fillRect((vw - tw) / 2, vh - 46, tw, 14);
+      ctx.fillStyle = '#f2e8d2'; ctx.fillText(portal.label, (vw - tw) / 2 + 6, vh - 42);
     }
   }
 }
 function drawMinimap() {
   const def = game.map.def;
-  const size = Math.min(120, Math.floor(vw * 0.3));
+  const size = Math.min(84, Math.floor(vw * 0.28));
   const k = size / Math.max(def.w, def.h) / T;
   const w = Math.round(def.w * T * k), h = Math.round(def.h * T * k);
-  const x = vw - w - 8, y = 34;
-  ctx.globalAlpha = 0.85;
+  const x = vw - w - 5, y = 24;
   ctx.fillStyle = 'rgba(12,10,16,0.9)'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-  ctx.drawImage(game.map.canvas, x, y, w, h);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.9; ctx.drawImage(game.map.canvas, x, y, w, h); ctx.globalAlpha = 1;
   ctx.strokeStyle = 'rgba(240,220,170,0.9)'; ctx.strokeRect(x - 2.5, y - 2.5, w + 5, h + 5);
   const p = game.player;
   ctx.fillStyle = '#ffdf6e';
-  ctx.fillRect(Math.round(x + (p.x + 32) * k) - 1, Math.round(y + (p.y + 54) * k) - 1, 3, 3);
+  ctx.fillRect(Math.round(x + p.x * k) - 1, Math.round(y + p.y * k) - 1, 3, 3);
 }
 function drawControls() {
   const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  ui.actionBtn = { x: vw - 54, y: vh - 54, r: 22 };
-  ui.debugBtn = { x: vw - 26, y: 16, r: 11 };
-  ui.mapBtn = { x: vw - 52, y: 16, r: 11 };
+  ui.actionBtn = { x: vw - 34, y: vh - 34, r: 14 };
+  ui.debugBtn = { x: vw - 16, y: 11, r: 8 };
+  ui.mapBtn = { x: vw - 34, y: 11, r: 8 };
   if (isTouch) {
     ctx.beginPath(); ctx.arc(ui.actionBtn.x, ui.actionBtn.y, ui.actionBtn.r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(240,200,110,0.55)'; ctx.fill();
+    ctx.fillStyle = 'rgba(244,200,110,0.55)'; ctx.fill();
     ctx.strokeStyle = 'rgba(60,40,20,0.7)'; ctx.stroke();
-    ctx.fillStyle = '#3a2418'; ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#3a2418'; ctx.font = 'bold 9px sans-serif';
     ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
     ctx.fillText('E', ui.actionBtn.x, ui.actionBtn.y); ctx.textAlign = 'left';
     const j = game.touch.joyBase;
     if (j) {
-      ctx.beginPath(); ctx.arc(j.x, j.y, 34, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(j.x, j.y, 22, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fill();
-      ctx.beginPath(); ctx.arc(j.x + game.touch.joyVec.x * 24, j.y + game.touch.joyVec.y * 24, 14, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(j.x + game.touch.joyVec.x * 15, j.y + game.touch.joyVec.y * 15, 9, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill();
     }
   }
   for (const [btn, label, on] of [[ui.mapBtn, 'M', game.minimap], [ui.debugBtn, 'C', game.debug]]) {
     ctx.beginPath(); ctx.arc(btn.x, btn.y, btn.r, 0, Math.PI * 2);
     ctx.fillStyle = on ? 'rgba(220,160,60,0.85)' : 'rgba(20,16,24,0.5)'; ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 8px sans-serif';
     ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
     ctx.fillText(label, btn.x, btn.y);
   }
@@ -584,22 +703,16 @@ function drawDebug(cam) {
   const x0 = Math.max(0, Math.floor(cam.x / T)), x1 = Math.min(def.w - 1, Math.ceil((cam.x + vw) / T));
   const y0 = Math.max(0, Math.floor(cam.y / T)), y1 = Math.min(def.h - 1, Math.ceil((cam.y + vh) / T));
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const v = map.tiles[y][x];
-    const solid = def.kind === 'outdoor' ? !!GROUND_BY_ID[v].solid : v !== FLOOR;
-    if (solid) { ctx.fillStyle = 'rgba(40,80,255,0.22)'; ctx.fillRect(x * T - cam.x, y * T - cam.y, T, T); }
+    // show it the way the collision code sees it, fences and gateways included
+    const solid = !!groundBlocks(x * T + T / 2, y * T + T / 2);
+    if (solid) { ctx.fillStyle = 'rgba(40,80,255,0.25)'; ctx.fillRect(x * T - cam.x, y * T - cam.y, T, T); }
   }
   for (const p of map.portals) {
-    ctx.fillStyle = 'rgba(255,220,40,0.25)'; ctx.fillRect(p.rect.x - cam.x, p.rect.y - cam.y, p.rect.w, p.rect.h);
-    ctx.strokeStyle = 'rgba(255,220,40,0.95)';
-    ctx.strokeRect(p.rect.x - cam.x + 0.5, p.rect.y - cam.y + 0.5, p.rect.w - 1, p.rect.h - 1);
+    ctx.fillStyle = 'rgba(255,220,40,0.3)'; ctx.fillRect(p.rect.x - cam.x, p.rect.y - cam.y, p.rect.w, p.rect.h);
   }
-  for (const o of map.objects) {
-    for (const c of o.cols) {
-      ctx.strokeStyle = 'rgba(255,40,40,0.95)';
-      ctx.strokeRect(c.x - cam.x + 0.5, c.y - cam.y + 0.5, c.w - 1, c.h - 1);
-    }
-    if (o.door) { ctx.strokeStyle = 'rgba(255,160,40,0.95)'; ctx.strokeRect(o.door.x - cam.x + 0.5, o.door.y - cam.y + 0.5, o.door.w - 1, o.door.h - 1); }
-    if (o.walkable) { ctx.strokeStyle = 'rgba(80,255,120,0.95)'; ctx.strokeRect(o.walkable.x - cam.x + 0.5, o.walkable.y - cam.y + 0.5, o.walkable.w - 1, o.walkable.h - 1); }
+  for (const o of map.objects) for (const c of o.cols) {
+    ctx.strokeStyle = 'rgba(255,40,40,0.95)';
+    ctx.strokeRect(c.x - cam.x + 0.5, c.y - cam.y + 0.5, c.w - 1, c.h - 1);
   }
   for (const e of game.entities) {
     const f = feet(e);
@@ -607,24 +720,22 @@ function drawDebug(cam) {
     ctx.strokeRect(f.x - cam.x + 0.5, f.y - cam.y + 0.5, f.w - 1, f.h - 1);
   }
   const p = game.player;
-  ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif';
-  ctx.fillText(`${map.name} ${def.w}x${def.h}  objects: ${map.objects.length}  tile: ${Math.floor((p.x + 32) / T)},${Math.floor((p.y + 54) / T)}`, 8, 30);
+  ctx.fillStyle = '#fff'; ctx.font = '8px sans-serif';
+  ctx.fillText(`${map.name} ${def.w}x${def.h} obj:${map.objects.length} tile:${Math.floor(p.x / T)},${Math.floor(p.y / T)} x${scale}`, 6, 22);
 }
 
 function render() {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.imageSmoothingEnabled = false;
   const cam = camera();
-  ctx.fillStyle = '#0b0a0e'; ctx.fillRect(0, 0, vw, vh);
+  ctx.fillStyle = '#14121a'; ctx.fillRect(0, 0, vw, vh);
   ctx.drawImage(game.map.canvas, -cam.x, -cam.y);
 
   const visible = o => !(o.x + o.w < cam.x || o.x > cam.x + vw || o.y + o.h < cam.y || o.y > cam.y + vh);
-  // rugs, torches and shelves belong to the scenery and go under the characters
-  for (const o of game.map.objects) if (o.flat && visible(o)) drawObject(o, cam);
-  // everything else is sorted by its bottom edge so the player walks in front and behind
+  for (const o of game.map.objects) if (!o.solid && visible(o)) drawObject(o, cam);
   const drawables = [];
-  for (const o of game.map.objects) if (!o.flat && visible(o)) drawables.push({ z: o.y + o.h, o });
-  for (const e of game.entities) drawables.push({ z: e.y + 62, e });
+  for (const o of game.map.objects) if (o.solid && visible(o)) drawables.push({ z: o.artBottom, o });
+  for (const e of game.entities) drawables.push({ z: e.y + T, e });
   drawables.sort((a, b) => a.z - b.z);
   for (const d of drawables) { if (d.o) drawObject(d.o, cam); else drawEntity(d.e, cam); }
 
@@ -658,7 +769,7 @@ function toView(ev) {
   const r = canvas.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1;
   return { x: (ev.clientX - r.left) * dpr / scale, y: (ev.clientY - r.top) * dpr / scale };
 }
-function hitCircle(p, c) { return c && Math.hypot(p.x - c.x, p.y - c.y) <= c.r + 6; }
+function hitCircle(p, c) { return c && Math.hypot(p.x - c.x, p.y - c.y) <= c.r + 5; }
 canvas.addEventListener('pointerdown', ev => {
   ev.preventDefault();
   const p = toView(ev);
@@ -682,8 +793,8 @@ canvas.addEventListener('pointermove', ev => {
   if (ev.pointerId !== game.touch.joyId) return;
   const p = toView(ev); const b = game.touch.joyBase;
   const dx = p.x - b.x, dy = p.y - b.y; const len = Math.hypot(dx, dy);
-  if (len < 6) { game.touch.joyVec = { x: 0, y: 0 }; return; }
-  const m = Math.min(1, len / 30);
+  if (len < 4) { game.touch.joyVec = { x: 0, y: 0 }; return; }
+  const m = Math.min(1, len / 20);
   game.touch.joyVec = { x: dx / len * m, y: dy / len * m };
 });
 function endJoy(ev) {
@@ -696,31 +807,29 @@ canvas.addEventListener('pointercancel', endJoy);
 
 // ---------------------------------------------------------------- loading
 async function loadAll() {
-  const objectNames = Object.keys(OBJECTS);
   const sheets = [
-    ['terrain', 'lpc-revised/Terrain/terrain_spring.png'],
-    ['paving', 'lpc-revised/Structure/Floor/Herringbone A.png'],
-    ['flowers', 'lpc-revised/Terrain/flowers.png'],
-    ['floor_tile', 'lpc-revised/Structure/Floor/Tile A.png'],
-    ['floor_wood', 'lpc-revised/Structure/Floor/Wood Floor A.png'],
-    ['wall_stone', 'lpc-revised/Structure/Walls/Jagged Stone Walls.png'],
-    ['wall_brick', 'lpc-revised/Structure/Walls/Brick Wall A.png'],
-    ['bubble', 'ninja-adventure/dialogue-bubble.png'],
-    ['facebox', 'ninja-adventure/faceset-box.png'],
+    ['medieval', 'medieval.png'], ['nature', 'nature.png'],
+    ['bubble', 'hud/dialogue-bubble.png'], ['facebox', 'hud/faceset-box.png'],
+    ['arrow', 'hud/arrow.png'],
   ];
-  const characters = ['monk', 'emperor', 'guard', 'villager', 'marshal', 'steward'];
-  for (const c of characters) sheets.push([c, 'characters/' + c + '.png']);
-
+  const cast = new Set();
+  for (const m of Object.values(WORLD.maps)) for (const n of (m.npcs || [])) cast.add(n.sheet);
+  cast.add(WORLD.start.sheet || 'monk');
+  const people = [...cast];
   const all = await Promise.all([
     ...sheets.map(([, p]) => loadImage(ASSETS + p)),
-    ...objectNames.map(n => loadImage(ASSETS + 'objects/' + OBJECTS[n].file)),
+    ...people.map(n => loadImage(ASSETS + 'characters/' + n + '.png')),
+    ...people.map(n => loadImage(ASSETS + 'faceset/' + n + '.png')),
   ]);
   sheets.forEach(([k], i) => game.images[k] = all[i]);
-  objectNames.forEach((n, i) => game.images['obj:' + n] = all[sheets.length + i]);
+  people.forEach((n, i) => {
+    game.images['ch:' + n] = all[sheets.length + i];
+    game.images['face:' + n] = all[sheets.length + people.length + i];
+  });
 
   const s = WORLD.start;
-  game.player = makeEntity('monk', WORLD.playerName || 'Brother Pacifer', s.x, s.y, s.dir,
-    { id: 'monk', npc: false });
+  game.player = makeEntity(s.sheet || 'monk', WORLD.playerName || 'Brother Pacifer',
+    s.x, s.y, s.dir, { id: 'player', npc: false });
   enterMap(s.map, [s.x, s.y], s.dir);
 }
 
@@ -732,7 +841,7 @@ function loop(ts) {
 }
 loadAll().then(() => {
   const el = document.getElementById('loading'); if (el) el.remove();
-  window.game = game;       // for debugging and for the test suite
+  window.game = game;
   window.buildMap = buildMap;
   requestAnimationFrame(loop);
 }).catch(err => {
