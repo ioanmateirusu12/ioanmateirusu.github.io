@@ -1,152 +1,190 @@
 # Pacifer
 
-Joc pixel art open-world în care un călugăr devine consilierul împăratului și rezolvă
-conflictele economice și sociale ale imperiului. Ținta finală este Android
-(HTML5 Canvas împachetat cu Capacitor), dar deocamdată rulează în orice browser.
+An open-world pixel-art game. A monk becomes the King's advisor and has to settle
+the realm's quarrels — hunger, taxes, a rotting bridge — knowing that every ruling
+costs something. The target platform is Android (HTML5 Canvas wrapped with
+Capacitor), but it runs in any browser today.
 
-## Cum îl pornești local, pe desktop
+## Running it locally
 
-**Dublu-clic pe `pacifer/index.html`.** Atât. Toate datele jocului sunt fișiere `.js`
-(nu `.json`), tocmai ca jocul să meargă deschis direct de pe disc, fără server.
+**Double-click `pacifer/index.html`.** That is all. Every piece of game data is a
+`.js` file rather than `.json`, precisely so the game runs off the disk with no
+server.
 
-Dacă browserul tău refuză fișierele locale, sau dacă vrei să deschizi jocul și de pe
-telefon din aceeași rețea Wi-Fi, pornește un server local:
+If your browser refuses local files, or you want to open the game from a phone on
+the same Wi-Fi, start a local server:
 
-- Windows: dublu-clic pe `pacifer/start.bat`
-- Linux / macOS: `./pacifer/start.sh` (prima dată: `chmod +x pacifer/start.sh`)
-- sau, manual, din rădăcina proiectului: `python3 -m http.server 8123`
-  și deschizi `http://localhost:8123/pacifer/`
+- Windows: double-click `pacifer/start.bat`
+- Linux / macOS: `./pacifer/start.sh` (first time: `chmod +x pacifer/start.sh`)
+- or by hand, from the project root: `python3 -m http.server 8123`,
+  then open `http://localhost:8123/pacifer/`
 
-Online, aceleași fișiere merg pe GitHub Pages la `/pacifer/`.
+The same files are served from GitHub Pages at `/pacifer/`.
 
-## Controale
+## Controls
 
-- **Desktop**: săgeți sau WASD pentru mers, `E` / `Enter` / `Space` pentru acțiune
-  (vorbește, intră pe ușă), săgeți sus/jos pentru alegerea răspunsului,
-  `C` pentru cutiile de coliziune.
-- **Touch (Android)**: atinge și trage oriunde în stânga ecranului pentru joystick,
-  butonul `E` pentru acțiune, butonul `C` pentru coliziuni, atingere pe caseta de
-  dialog pentru a continua, atingere pe un răspuns pentru a-l alege.
+- **Desktop**: arrows or WASD to walk, `E` / `Enter` / `Space` to act (talk, enter
+  a door), up/down to pick an answer, `M` for the minimap, `C` for collision boxes.
+- **Touch (Android)**: touch and drag anywhere on the left of the screen for the
+  joystick, the `E` button to act, `M` and `C` in the top-right corner, tap the
+  dialogue box to continue, tap an answer to choose it.
 
-Ușile se deschid singure când calci pe prag; eticheta din josul ecranului îți spune unde duc.
+Doors open when you step onto the threshold; a label at the bottom of the screen
+tells you where one leads.
 
-## Structura proiectului
+## What is in the world
+
+The realm of **Aurelia**, 100 × 76 tiles, running north to south:
+
+- the **royal castle** on its paved height: keep with two towers, a crenellated
+  curtain wall, a gatehouse over the great road, gardens either side of the
+  processional way
+- the **capital**: a market square with stalls and fountains, houses along the
+  streets, lamps down the main road
+- **farmland**, a mill pond, a hamlet, the river with two crossings
+- the **king's wood** to the west and the forest to the east
+
+Inside: the **throne hall** (the King, his steward, the guard), the
+**merchant's house**, the **steward's town house**.
+
+The story runs through three stats — treasury, order, food. The Marshal sends you
+out to see the realm before you advise anyone; the farms tell you about the hail,
+the mill about the bridge, the market about the merchant's full barns. What you
+have actually seen changes what you can say to the King, and his ruling moves the
+three numbers.
+
+## Project layout
 
 ```
 pacifer/
-  index.html          pagina jocului
-  game.js             motorul (hărți, coliziuni, personaje, cameră, dialog, controale)
+  index.html          the game page
+  game.js             the engine (maps, collision, characters, camera, dialogue, controls)
   data/
-    world.js          HĂRȚILE: teren, obiecte, personaje, treceri prin uși   <- se editează
-    dialogs.js        REPLICILE personajelor                                 <- se editează
-    objects.js        sprite-urile obiectelor + cutiile de coliziune         <- generat
-  assets/             imaginile (vezi CREDITS.md)
+    world.js          THE MAPS: terrain, objects, characters, doorways      <- edit this
+    dialogs.js        WHAT PEOPLE SAY                                       <- edit this
+    objects.js        object sprites + collision boxes                      <- generated
+  assets/             the artwork (see CREDITS.md)
   tools/
-    export_objects.py generează assets/objects/ + data/objects.js + foile de personaje
-    build_scene.py    generatorul primei imagini de test (păstrat ca referință)
-  start.sh, start.bat pornire cu server local (opțional)
+    export_objects.py cuts assets/objects/ + data/objects.js + character sheets
+    castle.py         builds the castle pieces: walls, towers, gatehouse, keep
+    build_scene.py    the very first static test render, kept for reference
+  start.sh, start.bat optional local server
 ```
 
-Motorul nu conține nicio hartă și nicio replică: totul vine din `data/`. Ca să schimbi
-lumea nu trebuie să te atingi de `game.js`.
+The engine holds no map and no line of dialogue: it all comes from `data/`. You
+can change the world without touching `game.js`.
 
-## Cum adaugi lucruri în joc
+## Adding things
 
-**O cameră nouă** — în `data/world.js`, la `maps`:
+**A new room** — in `data/world.js`, under `maps`:
 
 ```js
-hambar: {
-  name: 'Hambarul satului',
-  kind: 'interior',
+barn: {
+  name: 'The tithe barn',
+  kind: 'indoor',
   w: 12, h: 11,
-  room: [2, 3, 8, 5],          // podeaua; pereții se generează automat în jur
+  room: [2, 3, 8, 5],          // the floor; walls are built around it
   floor: 'wood', wall: 'brick',
-  extraFloor: [[5, 8, 1, 2]],  // pragul ușii, tăiat prin peretele de jos
+  extraFloor: [[5, 8, 1, 2]],  // the doorway, cut through the bottom wall
   objects: [['barrel', 3, 4], ['crate', 8, 4]],
-  npcs: [{ id: 'morarul', sheet: 'villager', name: 'Morarul', x: 6, y: 5, dir: 2 }],
-  portals: [{ rect: [5, 9, 1, 1], to: 'sat', spawn: [12, 18], dir: 2, label: 'Afară' }],
+  npcs: [{ id: 'reeve', sheet: 'villager', name: 'The Reeve', x: 6, y: 5, dir: 2 }],
+  portals: [{ rect: [5, 9, 1, 1], to: 'realm', spawn: [40, 60], dir: 2, label: 'Out' }],
 },
 ```
 
-și o trecere înspre ea, pe harta `sat`:
-`{ rect: [12, 17, 1, 1], to: 'hambar', spawn: [5.5, 7], dir: 0, label: 'Hambarul' }`.
+and a way in, on the `realm` map:
+`{ rect: [40, 59, 1, 1], to: 'barn', spawn: [5.5, 7], dir: 0, label: 'The tithe barn' }`.
 
-Coordonatele sunt în tile-uri (1 tile = 32 px) și pot fi fracționare. `dir`: 0 sus,
-1 stânga, 2 jos, 3 dreapta. Hărțile `kind: 'exterior'` folosesc în schimb `terrain`,
-o listă de dreptunghiuri `['water', x0, y0, x1, y1]`, iar marginile dintre iarbă,
-pământ și apă se autotilează singure.
+Coordinates are in tiles (1 tile = 32 px) and may be fractional. `dir` is
+0 up, 1 left, 2 down, 3 right.
 
-**Replici noi** — în `data/dialogs.js`, o funcție cu `id`-ul personajului. O alegere
-poate modifica indicatorii și poate ridica un steag de poveste pe care alte dialoguri
-îl citesc:
+**A forest** is one line, not a hundred placements:
 
 ```js
-morarul: g => g.flags.graneCumparate
-  ? [{ who: 'Morarul', text: 'Am primit grâul, părinte. Macin de dimineață.' }]
-  : [{ who: 'Morarul', text: 'Pietrele stau degeaba. Nu e ce macina.' }],
+groves: [
+  { types: ['tree1', 'tree4', 'pine2'], rect: [10, 60, 20, 12], count: 40, seed: 7 },
+],
 ```
 
-**Obiecte noi** — se decupează din foile din `assets/lpc-revised/` în
-`tools/export_objects.py` (`save('nume', imagine, [x, y, lățime, înălțime])`, unde
-lista e cutia de coliziune, relativă la colțul stânga-sus al sprite-ului), apoi
-`python3 pacifer/tools/export_objects.py`. Scriptul rescrie și `data/objects.js`.
-Un obiect cu `flat=True` e decor la nivelul podelei (covor, torță, raft) și se
-desenează sub personaje; `anim={...}` îi dă cadre de animație.
+The scatter skips roads, water and anything already standing there, and the same
+seed always gives the same wood.
 
-## Cum e construit motorul (`game.js`)
+**New ground** — outdoor maps paint rectangles in order:
+`['stone', 38, 29, 47, 38]`. The types are `grass`, `dirt`, `sand`, `stone` and
+`water`; grass blends itself into whatever it touches. Two kinds of ground meeting
+each other directly get a hard edge, so keep a strip of grass between them.
 
-- **Hărți multiple.** Fiecare hartă se construiește o singură dată (teren pre-randat
-  într-un canvas ascuns) și rămâne în memorie, deci intrarea și ieșirea dintr-o
-  cameră sunt instantanee. Personajele își păstrează pozițiile.
-- **Exterior**: grilă de iarbă / pământ / apă; marginile se aleg automat, pe sferturi
-  de tile, din setul de autotile al foii `terrain_spring.png`.
-- **Interior**: dai dreptunghiul podelei, motorul ridică pereții în jur și alege singur
-  capătul de sus, mijlocul și baza peretelui după vecini. Podeaua de marmură e o tablă
-  de șah, scândurile de lemn se aleg la întâmplare.
-- **Obiecte**: fiecare obiect e un sprite separat cu **cutia lui de coliziune** din
-  `data/objects.js`. Podul are o zonă `walkable` (apă pe care se poate merge).
-- **Personaje**: foi LPC complete (4 direcții × 9 cadre), cutie de coliziune la picioare
-  (24×16 px), mișcare separată pe axe pentru alunecare pe lângă obstacole. Personajele
-  și obiectele se desenează sortate după marginea de jos, deci jucătorul trece corect
-  prin fața și prin spatele lor.
-- **Treceri**: dreptunghiuri pe hartă; când calci pe unul, ecranul se stinge, se schimbă
-  harta și te trezești în locul indicat de `spawn`.
-- **Dialog**: replicile vin din `data/dialogs.js`; alegerile modifică indicatorii
-  (trezorerie, stabilitate, hrană) din colțul stânga-sus și ridică steaguri de poveste
-  în `game.flags`, care schimbă ce spun personajele data viitoare.
+**New lines** — in `data/dialogs.js`, a function keyed by the character's `id`.
+A choice can move the stats and raise a story flag that other conversations read:
 
-Pentru depanare, `C` desenează cutiile de coliziune (roșu), trecerile (galben),
-zonele pe care se poate merge (verde) și tile-urile solide (albastru).
+```js
+reeve: g => g.flags.grainBought
+  ? [{ who: 'The Reeve', text: 'The carts came through at dawn.' }]
+  : [{ who: 'The Reeve', text: 'The barn is half empty and the tithe is due.' }],
+```
 
-## Ce e în joc acum
+**New objects** — cut them out of the sheets in `assets/lpc-revised/` inside
+`tools/export_objects.py` (`save('name', image, [x, y, w, h])`, where the list is
+the collision box relative to the sprite's top-left corner), then run
+`python3 pacifer/tools/export_objects.py`. The script rewrites `data/objects.js`
+too. An object with `flat=True` is scenery at floor level (rug, torch, shelf) and
+is drawn under the characters; `anim={...}` gives it animation frames; `cols=[...]`
+gives it several collision boxes, which is how the gatehouse can be solid on both
+sides and open in the middle.
 
-Satul **Valea de Jos** cu palatul, două case, fântână, râu cu pod. Înăuntru:
-**sala tronului** (împăratul, garda), **casa negustorului** (grâne de cumpărat),
-**casa bătrânului** (podul care putrezește). Firul de poveste: afli de foamete de la
-sătean, cumperi grâne de la negustor, hotărăști cu împăratul ce se face cu darea —
-fiecare alegere mută trezoreria, stabilitatea și hrana.
+## How the engine works
 
-## Asset-uri
+- **Several maps.** Each one is built once — its ground is pre-rendered into an
+  offscreen canvas — and then kept, so walking in and out of a building is
+  instant and the characters stay where you left them.
+- **Outdoor ground** is a grid of grass / dirt / sand / stone / water. Grass picks
+  its own edge tiles per quarter-tile from the terrain sheet, so coastlines and
+  road shoulders draw themselves. Flowers and grass tufts are scattered on open
+  grass so large fields are not flat.
+- **Indoor rooms**: you give the floor rectangle, the engine raises the walls
+  around it and picks the cap, middle or base of each wall from its neighbours.
+  The marble floor is laid as a chequerboard, floorboards are picked at random.
+- **Objects** each carry their own collision box (or several). The bridge carries
+  a `walkable` zone, which is how you can cross water.
+- **Characters** use full LPC sheets (4 directions × 9 frames) with a 24×16 feet
+  box, moving one axis at a time so they slide along obstacles. Objects and
+  characters are sorted by their bottom edge, so you pass correctly in front of
+  and behind them.
+- **Doorways** are rectangles on the map; stepping on one fades the screen, swaps
+  the map and drops you at the far side.
+- **Dialogue** comes from `data/dialogs.js`; choices move treasury, order and food
+  and raise flags in `game.flags`, which change what people say next time.
 
-- `assets/lpc-revised/` – teren, copaci, case, ziduri, uși, ferestre, garduri, fântână,
-  mobilier de interior, torțe. Sursa: [ElizaWy/LPC](https://github.com/ElizaWy/LPC).
-  Licență OGA-BY 3.0 (credit obligatoriu).
-- `assets/ulpc/` – piesele de personaj (corp, cap, haine, coroană, pelerină, barbă, coif)
-  din [Universal LPC Spritesheet Character Generator](https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator).
-  Licențe mixte per piesă, vezi `CREDITS.md`.
-- `assets/ninja-adventure/` – caseta de dialog, rama de portret, săgeata și fontul 8×8 din
-  [Ninja Adventure](https://github.com/sparklinlabs/superpowers-asset-packs) de Pixel-boy. Licență CC0.
-- `assets/objects/`, `assets/characters/` – generate de `tools/export_objects.py`.
+`C` draws the collision boxes (red), doorways (yellow), walkable zones (green) and
+solid tiles (blue). `M` shows the minimap.
 
-Ordinea straturilor la personaje: umbră → pelerină (spate) → corp → picioare →
-încălțăminte → tors → jachetă/tabard → brâu → pelerină (față) → cap → barbă → păr →
-pălărie/coroană/coif. Piesele fără variante de culoare sunt recolorate prin maparea
-luminanței pe o rampă de două culori (funcția `tint`).
+## Assets
 
-## Pași următori propuși
+- `assets/lpc-revised/` — terrain, trees, houses, stone walls, doors, windows,
+  fences, fountain, indoor furniture, torches, paving. Source:
+  [ElizaWy/LPC](https://github.com/ElizaWy/LPC). Licence OGA-BY 3.0 (credit required).
+- `assets/ulpc/` — the character parts (body, head, clothes, crown, cape, beard,
+  helmet) from the
+  [Universal LPC Spritesheet Character Generator](https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator).
+  Mixed licences per piece, see `CREDITS.md`.
+- `assets/ninja-adventure/` — the dialogue box, portrait frame, arrow and 8×8 font
+  from [Ninja Adventure](https://github.com/sparklinlabs/superpowers-asset-packs)
+  by Pixel-boy. Licence CC0.
+- `assets/objects/`, `assets/characters/` — generated by `tools/export_objects.py`.
 
-1. Salvare în browser (poziție, indicatori, steaguri) și meniu de start.
-2. Sistem de quest-uri cu obiective vizibile, nu doar steaguri ascunse.
-3. Mai multe regiuni ale imperiului și drumuri între ele; provincii cu indicatori proprii.
-4. Sunet: pași, ușă, foc, o temă discretă.
-5. Împachetare Android cu Capacitor (ecran complet, orientare, icoană).
+The castle is not a stock sprite: `tools/castle.py` composes the curtain walls,
+the crenellations, the towers, the gatehouse and the keep tile by tile out of the
+LPC stone, door, window and pillar sheets.
+
+Character layer order: shadow → cape (back) → body → legs → feet → torso →
+jacket/tabard → belt → cape (front) → head → beard → hair → hat/crown/helmet.
+Pieces with no colour variant are recoloured by mapping luminance onto a
+two-colour ramp (the `tint` function).
+
+## Next steps
+
+1. Saving in the browser (position, stats, flags) and a title screen.
+2. A visible quest log instead of hidden flags.
+3. More provinces beyond the capital, each with its own stats.
+4. Sound: footsteps, doors, fire, a quiet theme.
+5. Android packaging with Capacitor (fullscreen, orientation, icon).

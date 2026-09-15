@@ -1,16 +1,16 @@
 @echo off
-REM Pacifer - pornire locala pe Windows.
+REM Pacifer - run it locally on Windows.
 REM
-REM De obicei nu ai nevoie de acest fisier: jocul merge deschis direct, prin
-REM dublu-clic pe index.html. Foloseste-l daca browserul refuza fisierele
-REM locale sau daca vrei sa deschizi jocul si de pe telefon, din aceeasi retea.
+REM You normally do not need this file: the game runs from a double-click on
+REM index.html. Use it if your browser refuses local files, or if you want to
+REM open the game from a phone on the same network.
 
 cd /d "%~dp0.."
 set PORT=8123
 echo Pacifer: http://localhost:%PORT%/pacifer/
-echo De pe telefon, in aceeasi retea Wi-Fi, foloseste adresa IP a acestui calculator
-echo (o vezi cu comanda ipconfig), de forma http://192.168.x.x:%PORT%/pacifer/
-echo Opreste serverul cu Ctrl+C.
+echo From a phone on the same Wi-Fi use this computer's IP address
+echo (run ipconfig to find it), like http://192.168.x.x:%PORT%/pacifer/
+echo Stop the server with Ctrl+C.
 start "" http://localhost:%PORT%/pacifer/
 python -m http.server %PORT%
 pause
