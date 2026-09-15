@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Pacifer</title>
+<style>
+  html,body{margin:0;height:100%;background:#1d1c22;overflow:hidden;overscroll-behavior:none}
+  canvas{display:block;touch-action:none;image-rendering:pixelated;image-rendering:crisp-edges}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#eae6dc;font-family:system-ui,sans-serif;font-size:14px;pointer-events:none;text-align:center;padding:0 16px}
+</style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="loading">Loading Pacifer…</div>
+  <!-- game data as .js files, so the game also runs straight off the disk (file://) -->
+  <script src="data/objects.js"></script>
+  <script src="data/world.js"></script>
+  <script src="data/dialogs.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
